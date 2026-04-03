@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Music, VolumeX, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 // --- Types ---
 type Team = 'cho' | 'han';
@@ -85,12 +85,16 @@ export default function App() {
 
   const playerRef = useRef<any>(null);
   const captureSoundRef = useRef<HTMLAudioElement | null>(null);
+  const topUiRef = useRef<HTMLDivElement>(null);
+  const tutorialBoxRef = useRef<HTMLDivElement>(null);
 
   // --- Dynamic Resizing ---
   const fitBoard = useCallback(() => {
-    const uiH = 180; // Estimated UI height
+    const topUiHeight = topUiRef.current?.offsetHeight || 0;
+    const tutorialBoxHeight = tutorialBoxRef.current?.offsetHeight || 0;
+    const uiH = topUiHeight + tutorialBoxHeight + 32; 
     const availH = window.innerHeight - uiH;
-    const availW = window.innerWidth * 0.95;
+    const availW = window.innerWidth * 0.97;
     const cell = Math.floor(Math.min(availW / 9, availH / 10));
     setCellSize(cell);
     document.documentElement.style.setProperty('--cell-size', `${cell}px`);
@@ -288,7 +292,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen select-none overflow-hidden">
-      <div className="flex flex-col items-center gap-2 mb-2">
+      <div ref={topUiRef} className="flex flex-col items-center gap-2 mb-2">
         <h1 className="text-3xl font-black text-[#3a1a00] tracking-tight drop-shadow-sm">🀄 레고 장기 교실</h1>
         <button 
           onClick={toggleBgm}
@@ -307,24 +311,38 @@ export default function App() {
         {/* SVG Background */}
         <svg className="absolute inset-0 w-full h-full z-0 pointer-events-none" viewBox="0 0 900 1000" preserveAspectRatio="none">
           <g stroke="#5c3a21" strokeWidth="1.8">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <line key={`h${i}`} x1="50" y1={50 + i * 100} x2="850" y2={50 + i * 100} />
-            ))}
-            {Array.from({ length: 9 }).map((_, i) => (
-              <line key={`v${i}`} x1={50 + i * 100} y1="50" x2={50 + i * 100} y2="950" />
-            ))}
+            <line x1="50" y1="50"  x2="850" y2="50"/>
+            <line x1="50" y1="150" x2="850" y2="150"/>
+            <line x1="50" y1="250" x2="850" y2="250"/>
+            <line x1="50" y1="350" x2="850" y2="350"/>
+            <line x1="50" y1="450" x2="850" y2="450"/>
+            <line x1="50" y1="550" x2="850" y2="550"/>
+            <line x1="50" y1="650" x2="850" y2="650"/>
+            <line x1="50" y1="750" x2="850" y2="750"/>
+            <line x1="50" y1="850" x2="850" y2="850"/>
+            <line x1="50" y1="950" x2="850" y2="950"/>
           </g>
-          {/* Cho Palace */}
-          <rect x="350" y="50" width="200" height="200" fill="rgba(100,140,220,0.08)" stroke="#4060a0" strokeWidth="2.5" strokeDasharray="8,4" opacity="0.6" />
-          <line x1="350" y1="50" x2="550" y2="250" stroke="#4060a0" strokeWidth="2" opacity="0.8" />
-          <line x1="550" y1="50" x2="350" y2="250" stroke="#4060a0" strokeWidth="2" opacity="0.8" />
-          {/* Han Palace */}
-          <rect x="350" y="750" width="200" height="200" fill="rgba(220,100,100,0.08)" stroke="#a04040" strokeWidth="2.5" strokeDasharray="8,4" opacity="0.6" />
-          <line x1="350" y1="750" x2="550" y2="950" stroke="#a04040" strokeWidth="2" opacity="0.8" />
-          <line x1="550" y1="750" x2="350" y2="950" stroke="#a04040" strokeWidth="2" opacity="0.8" />
-          {/* River */}
-          <rect x="52" y="452" width="796" height="96" fill="rgba(100,160,220,0.10)" />
-          <line x1="50" y1="500" x2="850" y2="500" stroke="#4a90c4" strokeWidth="1.2" strokeDasharray="12,8" opacity="0.5" />
+          <g stroke="#5c3a21" strokeWidth="1.8">
+            <line x1="50"  y1="50" x2="50"  y2="950"/>
+            <line x1="150" y1="50" x2="150" y2="950"/>
+            <line x1="250" y1="50" x2="250" y2="950"/>
+            <line x1="350" y1="50" x2="350" y2="950"/>
+            <line x1="450" y1="50" x2="450" y2="950"/>
+            <line x1="550" y1="50" x2="550" y2="950"/>
+            <line x1="650" y1="50" x2="650" y2="950"/>
+            <line x1="750" y1="50" x2="750" y2="950"/>
+            <line x1="850" y1="50" x2="850" y2="950"/>
+          </g>
+          <rect x="350" y="50" width="200" height="200" fill="none" stroke="#4060a0" strokeWidth="2.5" strokeDasharray="8,4" opacity="0.6"/>
+          <line x1="350" y1="50"  x2="550" y2="250" stroke="#4060a0" strokeWidth="2" opacity="0.8"/>
+          <line x1="550" y1="50"  x2="350" y2="250" stroke="#4060a0" strokeWidth="2" opacity="0.8"/>
+          <rect x="350" y="50" width="200" height="200" fill="rgba(100,140,220,0.08)" stroke="none"/>
+          <rect x="350" y="750" width="200" height="200" fill="none" stroke="#a04040" strokeWidth="2.5" strokeDasharray="8,4" opacity="0.6"/>
+          <line x1="350" y1="750" x2="550" y2="950" stroke="#a04040" strokeWidth="2" opacity="0.8"/>
+          <line x1="550" y1="750" x2="350" y2="950" stroke="#a04040" strokeWidth="2" opacity="0.8"/>
+          <rect x="350" y="750" width="200" height="200" fill="rgba(220,100,100,0.08)" stroke="none"/>
+          <rect x="52" y="452" width="796" height="96" fill="rgba(100,160,220,0.10)" stroke="none"/>
+          <line x1="50" y1="500" x2="850" y2="500" stroke="#4a90c4" strokeWidth="1.2" strokeDasharray="12,8" opacity="0.5"/>
           <text x="230" y="508" fontSize="28" fill="#2255aa" opacity="0.55" fontWeight="bold" textAnchor="middle" dominantBaseline="middle" fontFamily="serif">楚　河</text>
           <text x="670" y="508" fontSize="28" fill="#aa2222" opacity="0.55" fontWeight="bold" textAnchor="middle" dominantBaseline="middle" fontFamily="serif">漢　界</text>
         </svg>
@@ -388,6 +406,7 @@ export default function App() {
       </div>
 
       <motion.div 
+        ref={tutorialBoxRef}
         key={tutorialText}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
