@@ -166,6 +166,38 @@ export default function App() {
     return state;
   }, []);
 
+  const isKingInCheck = useCallback((color: Team, state: BoardState) => {
+    let kingIdx = -1;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      if (state[i] && state[i]?.color === color && state[i]?.type === 'king') {
+        kingIdx = i;
+        break;
+      }
+    }
+    if (kingIdx === -1) return false;
+    const opponent = color === 'cho' ? 'han' : 'cho';
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      if (state[i] && state[i]?.color === opponent) {
+        const { caps } = calcMoves(i, state);
+        if (caps.includes(kingIdx)) return true;
+      }
+    }
+    return false;
+  }, []);
+
+  const getFilteredMoves = useCallback((idx: number, state: BoardState) => {
+    const piece = state[idx];
+    if (!piece) return { moves: [], caps: [] };
+    const { moves, caps } = calcMoves(idx, state);
+    const filterFn = (to: number) => {
+      const sim = [...state];
+      sim[to] = sim[idx];
+      sim[idx] = null;
+      return !isKingInCheck(piece.color, sim);
+    };
+    return { moves: moves.filter(filterFn), caps: caps.filter(filterFn) };
+  }, [isKingInCheck]);
+
   const calcMoves = useCallback((idx: number, state: BoardState) => {
     const piece = state[idx];
     if (!piece) return { moves: [], caps: [] };
@@ -315,15 +347,19 @@ export default function App() {
     const piece = board[idx];
     if (!piece) return;
     setSelIdx(idx);
-    setTutorialText(piece.desc);
-    const { moves, caps } = calcMoves(idx, board);
+    let text = piece.desc;
+    const { moves, caps } = getFilteredMoves(idx, board);
+    if (moves.length === 0 && caps.length === 0) {
+      text += "\n(움직일 수 있는 곳이 없어요!)";
+    }
+    setTutorialText(text);
     setMoveCells(moves);
     setCapCells(caps);
   };
 
   const afterMove = (to: number, isPlayer: boolean, captured: PieceData | null) => {
     if (captured && captured.type === 'king') {
-      const winner = isPlayer ? '초나라(초록팀, 아들)' : '한나라(빨간팀, 컴퓨터)';
+      const winner = captured.color === 'han' ? '초나라(초록팀, 아들)' : '한나라(빨간팀, 컴퓨터)';
       setGameOver(true);
       setTutorialText(`🎉 게임 종료! ${winner} 승리! 🎉`);
       setTimeout(() => {
@@ -337,10 +373,18 @@ export default function App() {
     if (gameMode === 'match') {
       if (isPlayer) {
         setTurn('han');
-        setTutorialText("컴퓨터 로봇이 생각 중... 🤔");
+        if (isKingInCheck('han', board)) {
+          setTutorialText("🚨 장군! 컴퓨터 로봇이 위험해요!");
+        } else {
+          setTutorialText("컴퓨터 로봇이 생각 중... 🤔");
+        }
       } else {
         setTurn('cho');
-        setTutorialText("아들 차례! 멋지게 공격해봐요!");
+        if (isKingInCheck('cho', board)) {
+          setTutorialText("⚠️ 장군! 아들 왕이 위험해요! 피해야 해!");
+        } else {
+          setTutorialText("아들 차례! 멋지게 공격해봐요!");
+        }
       }
     }
   };
@@ -374,7 +418,7 @@ export default function App() {
     const all: { from: number; to: number; capVal: number; isCapture: boolean; score?: number }[] = [];
     for (let i = 0; i < BOARD_SIZE; i++) {
       if (!board[i] || board[i]?.color !== 'han') continue;
-      const { moves, caps } = calcMoves(i, board);
+      const { moves, caps } = getFilteredMoves(i, board);
       moves.forEach(to => all.push({ from: i, to, capVal: 0, isCapture: false }));
       caps.forEach(to => {
         const target = board[to];

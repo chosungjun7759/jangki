@@ -129,7 +129,10 @@ body {
   font-size: calc(var(--square-size) * 0.6);
   font-weight: bold;
   position: absolute;
-  width: 90%; height: 90%;
+  top: calc(var(--square-size) * 0.05);
+  left: calc(var(--square-size) * 0.05);
+  width: calc(var(--square-size) * 0.9);
+  height: calc(var(--square-size) * 0.9);
   background-color: #fff;
   border-radius: 50%;
   display: flex;
@@ -163,7 +166,7 @@ body {
 .capture-move::before {
   content: ''; position: absolute; inset: 6%;
   border: 0.5vmin solid rgba(220, 53, 69, 0.9);
-  border-radius: 4%; z-index: 15; pointer-events: none;
+  border-radius: 50%; z-index: 15; pointer-events: none;
 }
 
 .tutorial-box {
@@ -177,6 +180,7 @@ body {
   width: 100%;
   min-height: 5vh;
   color: #333; font-weight: bold;
+  white-space: pre-line;
 }
 
 /* 메뉴 오버레이 */
