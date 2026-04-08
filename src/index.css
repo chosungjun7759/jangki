@@ -1,148 +1,211 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: 'Comic Sans MS', '맑은 고딕', cursive, sans-serif;
-}
-
 :root {
-  --cell-size: 60px;
-  --board-bg: #deb887;
-  --line-color: #5c3a21;
-  --lego-red: #c0392b;
-  --piece-size: calc(var(--cell-size) * 0.80);
-  --piece-offset: calc(var(--cell-size) * 0.10);
-  --piece-font: calc(var(--cell-size) * 0.46);
-  --king-font: calc(var(--cell-size) * 0.52);
+  --lego-red: #8b4513; /* 나무 느낌의 어두운 갈색 */
+  --lego-board-light: #e6b981; /* 장기판 색상 */
+  --lego-stud-color: rgba(0, 0, 0, 0.05);
+  --board-size: 90vmin;
+  --square-size: calc(var(--board-size) / 10); /* 10줄 기준 크기 분할 */
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: linear-gradient(135deg, #e8f4f8 0%, #d0e8f0 100%);
+  background-color: #f4f4f4;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100dvh;
-  overflow: hidden;
-  font-family: var(--font-sans);
-  gap: 0;
+  font-family: 'Apple SD Gothic Neo', '맑은 고딕', 'Noto Sans KR', sans-serif;
+  touch-action: none;
 }
 
-/* ── 장기판 ── */
-.janggi-board-refined {
-  width: calc(var(--cell-size) * 9);
-  height: calc(var(--cell-size) * 10);
-  background-color: var(--board-bg);
+.lego-chess-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--board-size);
+}
+
+/* 상단 바 (제목 및 메뉴 버튼) */
+.top-bar {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1vh;
+}
+
+.game-title {
+  color: var(--lego-red);
+  font-size: clamp(14px, 4.5vmin, 28px);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  text-shadow: 0.2vmin 0.2vmin 0 white;
+  margin: 0;
+}
+
+.menu-back-btn {
+  padding: 0.8vmin 2vmin;
+  font-size: clamp(11px, 2.3vmin, 16px);
+  background-color: #607d8b;
+  color: white;
+  border: none;
+  border-radius: 1vmin;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0.3vmin 0.3vmin 1vmin rgba(0,0,0,0.2);
+  transition: transform 0.1s;
+}
+.menu-back-btn:active { transform: scale(0.95); }
+
+.music-controls {
+  display: flex;
+  gap: 1.5vmin;
+  align-items: center;
+  margin-bottom: 1vh;
+}
+
+.bgm-select {
+  padding: 0.8vmin 1.5vmin;
+  font-size: clamp(11px, 2.3vmin, 16px);
+  border-radius: 2vmin;
+  border: 0.4vmin solid var(--lego-red);
+  color: #333;
+  font-weight: bold;
+  outline: none;
+  background: white;
+}
+
+.bgm-btn {
+  padding: 0.8vmin 2.5vmin;
+  font-size: clamp(11px, 2.3vmin, 16px);
+  background-color: var(--lego-red);
+  color: white;
+  border: none;
+  border-radius: 2vmin;
+  box-shadow: 0.3vmin 0.3vmin 1vmin rgba(0,0,0,0.2);
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.1s;
+}
+.bgm-btn:active { transform: scale(0.95); }
+
+/* 장기판 그리드 (9열 10행) */
+.lego-board {
+  display: grid;
+  grid-template-columns: repeat(9, var(--square-size));
+  grid-template-rows: repeat(10, var(--square-size));
+  border: 2vmin solid var(--lego-red);
+  border-radius: 1vmin;
+  background-color: var(--lego-board-light);
+  box-shadow: 0.5vmin 0.5vmin 2vmin rgba(0,0,0,0.3);
   position: relative;
-  border: calc(var(--cell-size) * 0.08) solid #5c3a21;
-  border-radius: calc(var(--cell-size) * 0.1);
-  box-shadow:
-    0 4px 20px rgba(0,0,0,0.45),
-    inset 0 1px 3px rgba(255,255,255,0.3);
   overflow: hidden;
 }
 
-/* 나뭇결 텍스처 */
-.janggi-board-refined::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent calc(var(--cell-size) * 2),
-    rgba(0,0,0,0.03) calc(var(--cell-size) * 2),
-    rgba(0,0,0,0.03) calc(var(--cell-size) * 2.5)
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 이동 가능: 초록 원 */
-.valid-move-indicator-refined::after {
-  content: '';
-  position: absolute;
-  width: 38%; height: 38%;
-  top: 31%; left: 31%;
-  background-color: rgba(46, 204, 113, 0.88);
-  border: 2px solid rgba(255,255,255,0.9);
-  border-radius: 50%;
-  z-index: 20;
-  pointer-events: none;
-}
-
-/* 포획 가능: 붉은 링 */
-.capture-target-indicator::after {
-  content: '';
-  position: absolute;
-  inset: 8%;
-  border: 3px solid rgba(231, 76, 60, 0.92);
-  border-radius: 22%;
-  z-index: 20;
-  pointer-events: none;
-  box-shadow: inset 0 0 4px rgba(231,76,60,0.3);
-}
-
-/* ── 기물 ── */
-.piece-refined {
-  position: absolute;
-  top: 0; left: 0;
-  width: var(--piece-size);
-  height: var(--piece-size);
-  border-radius: 22%;
+.square {
+  width: var(--square-size);
+  height: var(--square-size);
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: var(--piece-font);
-  font-weight: 900;
+  cursor: pointer;
+  border: 1px solid #000;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 궁성 굵은 테두리 */
+.square.palace-top { border-top: 3px solid #000; }
+.square.palace-bottom { border-bottom: 3px solid #000; }
+.square.palace-left { border-left: 3px solid #000; }
+.square.palace-right { border-right: 3px solid #000; }
+
+/* 기물 디자인 */
+.piece {
+  font-size: calc(var(--square-size) * 0.6);
+  font-weight: bold;
+  position: absolute;
+  width: 90%; height: 90%;
+  background-color: #fff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.25s ease-in-out, opacity 0.3s;
   z-index: 10;
-  transition: transform 0.22s ease-in-out;
   pointer-events: none;
   user-select: none;
-  /* 볼록한 나무 기물 효과 */
-  background: radial-gradient(ellipse at 35% 30%, #fff8e7 0%, #f5dfa0 40%, #d4a843 100%);
-  border: 2px solid #a07030;
-  box-shadow:
-    0 3px 6px rgba(0,0,0,0.4),
-    inset 0 1px 3px rgba(255,255,255,0.5),
-    inset 0 -2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0.2vmin 0.2vmin 0.5vmin rgba(0,0,0,0.3);
 }
 
-.piece-refined.cho {
-  color: #003580;
-  background: radial-gradient(ellipse at 35% 30%, #e8f0ff 0%, #c8d8f8 40%, #7090c8 100%);
-  border-color: #4060a0;
-}
-.piece-refined.han {
-  color: #8b0000;
-  background: radial-gradient(ellipse at 35% 30%, #fff0f0 0%, #f8c8c8 40%, #c87070 100%);
-  border-color: #a04040;
+/* 초나라(초록) / 한나라(빨강) */
+.piece.cho { color: #2e7d32; border: 0.4vmin solid #2e7d32; }
+.piece.han { color: #d32f2f; border: 0.4vmin solid #d32f2f; }
+
+.piece.selected {
+  background-color: rgba(255, 235, 59, 0.85);
+  box-shadow: 0 0 2vmin 1.2vmin rgba(255, 235, 59, 0.85);
+  z-index: 20;
 }
 
-.piece-refined.king {
-  font-size: var(--king-font);
-  border-width: 3px;
-  border-style: double;
-}
-.piece-refined.cho.king { border-color: #2050a0; }
-.piece-refined.han.king { border-color: #a02020; }
-
-.piece-refined.selected {
-  box-shadow:
-    0 0 0 3px #ffe500,
-    0 0 16px 4px rgba(255,229,0,0.75),
-    0 3px 8px rgba(0,0,0,0.4);
-  z-index: 15;
+.valid-move::before {
+  content: ''; position: absolute;
+  width: 38%; height: 38%;
+  background-color: rgba(76, 175, 80, 0.88);
+  border: 0.3vmin solid white;
+  border-radius: 50%; z-index: 15; pointer-events: none;
 }
 
-@keyframes capAnim {
-  0%   { opacity:1; transform: var(--cur-tf) scale(1) rotate(0); }
-  50%  { opacity:.6; transform: var(--cur-tf) scale(1.3) rotate(180deg); }
-  100% { opacity:0; transform: var(--cur-tf) scale(0) rotate(360deg); }
+.capture-move::before {
+  content: ''; position: absolute; inset: 6%;
+  border: 0.5vmin solid rgba(220, 53, 69, 0.9);
+  border-radius: 4%; z-index: 15; pointer-events: none;
 }
-.piece-refined.being-captured { animation: capAnim 0.35s ease-out forwards; z-index:25; }
+
+.tutorial-box {
+  margin-top: 1vh;
+  padding: 1.2vmin 2vmin;
+  background-color: #fffde7;
+  border: 0.5vmin dashed #fbc02d;
+  border-radius: 2vmin;
+  font-size: clamp(11px, 2.5vmin, 18px);
+  text-align: center;
+  width: 100%;
+  min-height: 5vh;
+  color: #333; font-weight: bold;
+}
+
+/* 메뉴 오버레이 */
+.menu-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background-color: rgba(255,255,255,0.96);
+  z-index: 100; display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+}
+
+.menu-title { font-size: clamp(16px, 4vmin, 26px); color: var(--lego-red); margin-bottom: 2vh; font-weight: bold; }
+.menu-btn {
+  width: 80%; padding: 1.3vh; margin-bottom: 1.2vh;
+  font-size: clamp(13px, 2.8vmin, 20px); font-weight: bold;
+  background-color: #fbc02d; border: 0.5vmin solid #f57f17;
+  border-radius: 2vmin; cursor: pointer; transition: transform 0.1s;
+}
+.menu-btn:active { transform: scale(0.95); }
+
+.diff-container { display: none; flex-direction: column; width: 80%; }
+.diff-btn {
+  padding: 1vh; margin-bottom: 0.8vh; font-size: clamp(11px, 2.3vmin, 17px);
+  color: white; border: none; border-radius: 2vmin; cursor: pointer; font-weight: bold;
+}
+.diff-btn:active { transform: scale(0.95); }
+
+@keyframes captureAnim {
+  0%   { transform: scale(1)   rotate(0);    opacity: 1; }
+  50%  { transform: scale(1.3) rotate(180deg); opacity: 0.6; }
+  100% { transform: scale(0)   rotate(360deg); opacity: 0; }
+}
+.piece.being-captured { animation: captureAnim 0.3s ease-out forwards; z-index: 25; }

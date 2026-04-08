@@ -3,101 +3,139 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Info } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // --- Types ---
 type Team = 'cho' | 'han';
-type PieceType = 'cha' | 'ma' | 'sang' | 'sa' | 'king' | 'po' | 'zol' | 'bing';
+type PieceType = 'rook' | 'knight' | 'elephant' | 'cannon' | 'guard' | 'king' | 'pawn';
 
 interface PieceData {
-  id: string;
-  text: string;
-  team: Team;
   type: PieceType;
+  emoji: string;
+  color: Team;
   desc: string;
 }
 
 type BoardState = (PieceData | null)[];
 
-// --- Constants ---
 const ROWS = 10;
 const COLS = 9;
 const BOARD_SIZE = ROWS * COLS;
 
-const INITIAL_SETUP: { [key: number]: Omit<PieceData, 'id'> } = {
-  // Cho (Blue) - Top
-  0: { text: '車', team: 'cho', type: 'cha', desc: "초 '차(車)': 직선으로 끝까지 달려요!" },
-  1: { text: '馬', team: 'cho', type: 'ma', desc: "초 '마(馬)': 직선 1칸 후 대각 1칸!" },
-  2: { text: '象', team: 'cho', type: 'sang', desc: "초 '상(象)': 직선 1칸 후 대각 2칸!" },
-  3: { text: '士', team: 'cho', type: 'sa', desc: "초 '사(士)': 궁성 안에서만 움직여요." },
-  5: { text: '士', team: 'cho', type: 'sa', desc: "초 '사(士)': 궁성 안에서만 움직여요." },
-  6: { text: '象', team: 'cho', type: 'sang', desc: "초 '상(象)': 직선 1칸 후 대각 2칸!" },
-  7: { text: '馬', team: 'cho', type: 'ma', desc: "초 '마(馬)': 직선 1칸 후 대각 1칸!" },
-  8: { text: '車', team: 'cho', type: 'cha', desc: "초 '차(車)': 직선으로 끝까지 달려요!" },
-  13: { text: '楚', team: 'cho', type: 'king', desc: "초나라 대장 '초(楚)': 궁성 안에서만!" }, 
-  19: { text: '包', team: 'cho', type: 'po', desc: "초 '포(包)': 기물 1개를 넘어서 공격!" },
-  25: { text: '包', team: 'cho', type: 'po', desc: "초 '포(包)': 기물 1개를 넘어서 공격!" },
-  27: { text: '卒', team: 'cho', type: 'zol', desc: "초 '졸(卒)': 앞 또는 옆으로 1칸!" },
-  29: { text: '卒', team: 'cho', type: 'zol', desc: "초 '졸(卒)': 앞 또는 옆으로 1칸!" },
-  31: { text: '卒', team: 'cho', type: 'zol', desc: "초 '졸(卒)': 앞 또는 옆으로 1칸!" },
-  33: { text: '卒', team: 'cho', type: 'zol', desc: "초 '졸(卒)': 앞 또는 옆으로 1칸!" },
-  35: { text: '卒', team: 'cho', type: 'zol', desc: "초 '졸(卒)': 앞 또는 옆으로 1칸!" },
-
-  // Han (Red) - Bottom
-  54: { text: '兵', team: 'han', type: 'bing', desc: "한 '병(兵)': 앞 또는 옆으로 1칸!" },
-  56: { text: '兵', team: 'han', type: 'bing', desc: "한 '병(兵)': 앞 또는 옆으로 1칸!" },
-  58: { text: '兵', team: 'han', type: 'bing', desc: "한 '병(兵)': 앞 또는 옆으로 1칸!" },
-  60: { text: '兵', team: 'han', type: 'bing', desc: "한 '병(兵)': 앞 또는 옆으로 1칸!" },
-  62: { text: '兵', team: 'han', type: 'bing', desc: "한 '병(兵)': 앞 또는 옆으로 1칸!" },
-  64: { text: '包', team: 'han', type: 'po', desc: "한 '포(包)': 기물 1개를 넘어서 공격!" },
-  70: { text: '包', team: 'han', type: 'po', desc: "한 '포(包)': 기물 1개를 넘어서 공격!" },
-  76: { text: '漢', team: 'han', type: 'king', desc: "한나라 대장 '한(漢)': 궁성 안에서만!" }, 
-  81: { text: '車', team: 'han', type: 'cha', desc: "한 '차(車)': 직선으로 끝까지 달려요!" },
-  82: { text: '馬', team: 'han', type: 'ma', desc: "한 '마(馬)': 직선 1칸 후 대각 1칸!" },
-  83: { text: '象', team: 'han', type: 'sang', desc: "한 '상(象)': 직선 1칸 후 대각 2칸!" },
-  84: { text: '士', team: 'han', type: 'sa', desc: "한 '사(士)': 궁성 안에서만 움직여요." },
-  86: { text: '士', team: 'han', type: 'sa', desc: "한 '사(士)': 궁성 안에서만 움직여요." },
-  87: { text: '象', team: 'han', type: 'sang', desc: "한 '상(象)': 직선 1칸 후 대각 2칸!" },
-  88: { text: '馬', team: 'han', type: 'ma', desc: "한 '마(馬)': 직선 1칸 후 대각 1칸!" },
-  89: { text: '車', team: 'han', type: 'cha', desc: "한 '차(車)': 직선으로 끝까지 달려요!" },
+const PIECE_VALUE: Record<PieceType, number> = {
+  pawn: 2,
+  knight: 5,
+  elephant: 3,
+  rook: 13,
+  cannon: 7,
+  guard: 3,
+  king: 1000
 };
 
-const DIAG_SET = new Set(['0,3','1,4','2,5','0,5','2,3','7,3','8,4','9,5','7,5','9,3']);
+const DESC: Record<Team, Record<PieceType, string>> = {
+  cho: {
+    rook: "차(車)! 십자 방향으로 쌩쌩 끝까지 달려요!",
+    knight: "마(馬)! 한 칸 직진 후 대각선으로 폴짝!",
+    elephant: "상(象)! 한 칸 직진 후 대각선으로 두 칸 쑥쑥!",
+    cannon: "포(包)! 다른 말을 훌쩍 뛰어넘어 공격해요!",
+    guard: "사(士)! 궁성 안에서 왕을 지켜요.",
+    king: "초(楚)! 왕입니다. 잡히면 져요!",
+    pawn: "졸(卒)! 앞으로, 양옆으로 한 칸씩 진격!"
+  },
+  han: {
+    rook: "차(車)! 십자 방향으로 쌩쌩 끝까지 달려요!",
+    knight: "마(馬)! 한 칸 직진 후 대각선으로 폴짝!",
+    elephant: "상(象)! 한 칸 직진 후 대각선으로 두 칸 쑥쑥!",
+    cannon: "포(包)! 다른 말을 훌쩍 뛰어넘어 공격해요!",
+    guard: "사(士)! 궁성 안에서 왕을 지켜요.",
+    king: "한(漢)! 왕입니다. 잡히면 져요!",
+    pawn: "병(兵)! 앞으로, 양옆으로 한 칸씩 진격!"
+  }
+};
 
 export default function App() {
-  const [board, setBoard] = useState<BoardState>(() => {
-    const initialBoard = Array(BOARD_SIZE).fill(null);
-    Object.entries(INITIAL_SETUP).forEach(([index, data]) => {
-      initialBoard[parseInt(index)] = { ...data, id: `piece-${index}-${Math.random()}` };
-    });
-    return initialBoard;
-  });
-
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [board, setBoard] = useState<BoardState>(Array(BOARD_SIZE).fill(null));
+  const [selIdx, setSelIdx] = useState<number | null>(null);
   const [moveCells, setMoveCells] = useState<number[]>([]);
   const [capCells, setCapCells] = useState<number[]>([]);
-  const [tutorialText, setTutorialText] = useState("안녕! 장기말을 터치해서 어디로 갈 수 있는지 알아봐! 🎉");
-  const [isPlayingBgm, setIsPlayingBgm] = useState(false);
-  const [cellSize, setCellSize] = useState(60);
-  const [capturedPiece, setCapturedPiece] = useState<{ piece: PieceData, index: number } | null>(null);
+  const [gameMode, setGameMode] = useState<'none' | 'tutorial' | 'match'>('none');
+  const [gameDiff, setGameDiff] = useState<string>('');
+  const [turn, setTurn] = useState<Team | ''>('cho');
+  const [gameOver, setGameOver] = useState(false);
+  const [tutorialText, setTutorialText] = useState('모드를 골라주세요!');
+  const [showDiffOptions, setShowDiffOptions] = useState(false);
+  const [bgmActive, setBgmActive] = useState(false);
+  const [curVideoId, setCurVideoId] = useState('iQIkgz9P-nM');
+  const [capturingIdx, setCapturingIdx] = useState<number | null>(null);
 
-  const playerRef = useRef<any>(null);
-  const captureSoundRef = useRef<HTMLAudioElement | null>(null);
-  const topUiRef = useRef<HTMLDivElement>(null);
-  const tutorialBoxRef = useRef<HTMLDivElement>(null);
+  const ytPlayerRef = useRef<any>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
-  // --- Dynamic Resizing ---
+  // --- YouTube API ---
+  useEffect(() => {
+    const onPlayerReady = () => {
+      // Player is ready
+    };
+
+    const initPlayer = () => {
+      if ((window as any).YT && (window as any).YT.Player) {
+        ytPlayerRef.current = new (window as any).YT.Player('youtube-player', {
+          height: '0',
+          width: '0',
+          videoId: curVideoId,
+          host: 'https://www.youtube-nocookie.com',
+          playerVars: { autoplay: 0, loop: 1, playlist: curVideoId },
+          events: {
+            onReady: onPlayerReady
+          }
+        });
+      }
+    };
+
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      (window as any).onYouTubeIframeAPIReady = initPlayer;
+    } else {
+      initPlayer();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (ytPlayerRef.current && typeof ytPlayerRef.current.loadVideoById === 'function') {
+      ytPlayerRef.current.loadVideoById(curVideoId);
+      if (bgmActive) {
+        ytPlayerRef.current.playVideo();
+      }
+    }
+  }, [curVideoId]);
+
+  const toggleBgm = () => {
+    if (!ytPlayerRef.current || typeof ytPlayerRef.current.playVideo !== 'function') return;
+    if (bgmActive) {
+      ytPlayerRef.current.pauseVideo();
+      setBgmActive(false);
+    } else {
+      ytPlayerRef.current.playVideo();
+      setBgmActive(true);
+    }
+  };
+
+  // --- Board Fitting ---
   const fitBoard = useCallback(() => {
-    const topUiHeight = topUiRef.current?.offsetHeight || 0;
-    const tutorialBoxHeight = tutorialBoxRef.current?.offsetHeight || 0;
-    const uiH = topUiHeight + tutorialBoxHeight + 32; 
+    const root = document.documentElement;
+    const title = document.querySelector('.game-title') as HTMLElement;
+    const ctrls = document.querySelector('.music-controls') as HTMLElement;
+    const tutBox = document.querySelector('.tutorial-box') as HTMLElement;
+    const uiH = (title?.offsetHeight || 0) + (ctrls?.offsetHeight || 0) + (tutBox?.offsetHeight || 0) + 48;
     const availH = window.innerHeight - uiH;
     const availW = window.innerWidth * 0.97;
-    const cell = Math.floor(Math.min(availW / 9, availH / 10));
-    setCellSize(cell);
-    document.documentElement.style.setProperty('--cell-size', `${cell}px`);
+    const sizeByWidth = availW * (10 / 9);
+    const sizeByHeight = availH;
+    const boardHeight = Math.floor(Math.min(sizeByWidth, sizeByHeight));
+    root.style.setProperty('--board-size', boardHeight + 'px');
   }, []);
 
   useEffect(() => {
@@ -106,316 +144,437 @@ export default function App() {
     return () => window.removeEventListener('resize', fitBoard);
   }, [fitBoard]);
 
-  // --- YouTube API ---
-  useEffect(() => {
-    if (!(window as any).YT) {
-      const tag = document.createElement('script');
-      tag.src = "https://www.youtube.com/iframe_api";
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-    }
-
-    (window as any).onYouTubeIframeAPIReady = () => {
-      playerRef.current = new (window as any).YT.Player('youtube-player', {
-        height: '0', width: '0', videoId: 'iQIkgz9P-nM',
-        host: 'https://www.youtube-nocookie.com',
-        playerVars: { 'autoplay': 0, 'loop': 1, 'playlist': 'iQIkgz9P-nM' }
-      });
+  // --- Game Logic ---
+  const makeSetup = useCallback(() => {
+    const state: BoardState = Array(BOARD_SIZE).fill(null);
+    const add = (r: number, c: number, type: PieceType, emoji: string, color: Team) => {
+      state[r * COLS + c] = { type, emoji, color, desc: DESC[color][type] };
     };
+
+    // 초나라(파란색, 위쪽)
+    add(0, 0, 'rook', '車', 'cho'); add(0, 1, 'knight', '馬', 'cho'); add(0, 2, 'elephant', '象', 'cho'); add(0, 3, 'guard', '士', 'cho'); add(0, 5, 'guard', '士', 'cho'); add(0, 6, 'elephant', '象', 'cho'); add(0, 7, 'knight', '馬', 'cho'); add(0, 8, 'rook', '車', 'cho');
+    add(1, 4, 'king', '楚', 'cho');
+    add(2, 1, 'cannon', '包', 'cho'); add(2, 7, 'cannon', '包', 'cho');
+    add(3, 0, 'pawn', '卒', 'cho'); add(3, 2, 'pawn', '卒', 'cho'); add(3, 4, 'pawn', '卒', 'cho'); add(3, 6, 'pawn', '卒', 'cho'); add(3, 8, 'pawn', '卒', 'cho');
+
+    // 한나라(빨간색, 아래쪽)
+    add(9, 0, 'rook', '車', 'han'); add(9, 1, 'knight', '馬', 'han'); add(9, 2, 'elephant', '象', 'han'); add(9, 3, 'guard', '士', 'han'); add(9, 5, 'guard', '士', 'han'); add(9, 6, 'elephant', '象', 'han'); add(9, 7, 'knight', '馬', 'han'); add(9, 8, 'rook', '車', 'han');
+    add(8, 4, 'king', '漢', 'han');
+    add(7, 1, 'cannon', '包', 'han'); add(7, 7, 'cannon', '包', 'han');
+    add(6, 0, 'pawn', '兵', 'han'); add(6, 2, 'pawn', '兵', 'han'); add(6, 4, 'pawn', '兵', 'han'); add(6, 6, 'pawn', '兵', 'han'); add(6, 8, 'pawn', '兵', 'han');
+
+    return state;
   }, []);
 
-  const toggleBgm = () => {
-    if (captureSoundRef.current) captureSoundRef.current.load();
-    if (!playerRef.current) return;
-    if (isPlayingBgm) {
-      playerRef.current.pauseVideo();
-      setIsPlayingBgm(false);
-    } else {
-      playerRef.current.playVideo();
-      setIsPlayingBgm(true);
-    }
-  };
-
-  // --- Move Logic ---
-  const ok = (r: number, c: number) => r >= 0 && r < ROWS && c >= 0 && c < COLS;
-  const toI = (r: number, c: number) => r * COLS + c;
-  const inTopP = (r: number, c: number) => r >= 0 && r <= 2 && c >= 3 && c <= 5;
-  const inBotP = (r: number, c: number) => r >= 7 && r <= 9 && c >= 3 && c <= 5;
-  const canDiag = (r1: number, c1: number, r2: number, c2: number) =>
-    DIAG_SET.has(`${r1},${c1}`) && DIAG_SET.has(`${r2},${c2}`);
-
-  const calcMoves = useCallback((idx: number, type: PieceType, team: Team) => {
+  const calcMoves = useCallback((idx: number, state: BoardState) => {
+    const piece = state[idx];
+    if (!piece) return { moves: [], caps: [] };
     const moves: number[] = [], caps: number[] = [];
     const r = Math.floor(idx / COLS), c = idx % COLS;
-    const enemy = team === 'cho' ? 'han' : 'cho';
+    const ok = (nr: number, nc: number) => nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS;
 
-    const reg = (nr: number, nc: number) => {
-      if (!ok(nr, nc)) return;
-      const t = board[toI(nr, nc)];
-      if (!t) moves.push(toI(nr, nc));
-      else if (t.team === enemy) caps.push(toI(nr, nc));
+    const inPalace = (nr: number, nc: number) => (nr >= 0 && nr <= 2 && nc >= 3 && nc <= 5) || (nr >= 7 && nr <= 9 && nc >= 3 && nc <= 5);
+    const isCenter = (nr: number, nc: number) => (nr === 1 && nc === 4) || (nr === 8 && nc === 4);
+
+    const add = (nr: number, nc: number) => {
+      if (!ok(nr, nc)) return false;
+      const t = state[nr * COLS + nc];
+      if (!t) { moves.push(nr * COLS + nc); return true; }
+      if (t.color !== piece.color && !(piece.type === 'cannon' && t.type === 'cannon')) caps.push(nr * COLS + nc);
+      return false;
     };
 
-    if (type === 'cha') {
-      [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
-        for (let i = 1; i < 10; i++) {
-          const nr = r + dr * i, nc = c + dc * i;
-          if (!ok(nr, nc)) break;
-          const t = board[toI(nr, nc)];
-          if (!t) { moves.push(toI(nr, nc)); continue; }
-          if (t.team === enemy) caps.push(toI(nr, nc));
-          break;
-        }
+    // 1. 차(車)
+    if (piece.type === 'rook') {
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+        for (let i = 1; i < 10; i++) if (!add(r + dr * i, c + dc * i)) break;
       });
-    } else if (type === 'ma') {
-      [{ d1: [-1, 0], d2: [[-2, -1], [-2, 1]] }, { d1: [1, 0], d2: [[2, -1], [2, 1]] },
-       { d1: [0, -1], d2: [[-1, -2], [1, -2]] }, { d1: [0, 1], d2: [[-1, 2], [1, 2]] }
-      ].forEach(({ d1, d2 }) => {
-        const ri = r + d1[0], ci = c + d1[1];
-        if (!ok(ri, ci) || board[toI(ri, ci)]) return;
-        d2.forEach(([dr, dc]) => reg(r + dr, c + dc));
-      });
-    } else if (type === 'sang') {
-      [{ d1: [-1, 0], d2: [[-1, -1], [-1, 1]] }, { d1: [1, 0], d2: [[1, -1], [1, 1]] },
-       { d1: [0, -1], d2: [[-1, -1], [1, -1]] }, { d1: [0, 1], d2: [[-1, 1], [1, 1]] }
-      ].forEach(({ d1, d2 }) => {
-        const r1 = r + d1[0], c1 = c + d1[1];
-        if (!ok(r1, c1) || board[toI(r1, c1)]) return;
-        d2.forEach(([dr, dc]) => {
-          const r2 = r1 + dr, c2 = c1 + dc;
-          if (!ok(r2, c2) || board[toI(r2, c2)]) return;
-          reg(r2 + dr, c2 + dc);
+      if (isCenter(r, c)) {
+        [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([dr, dc]) => {
+          let nr = r + dr, nc = c + dc; while (inPalace(nr, nc)) { if (!add(nr, nc)) break; nr += dr; nc += dc; }
         });
-      });
-    } else if (type === 'sa' || type === 'king') {
-      const inP = inTopP(r, c) ? inTopP : inBotP;
-      [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
-        if (inP(r + dr, c + dc)) reg(r + dr, c + dc);
-      });
-      [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([dr, dc]) => {
-        if (inP(r + dr, c + dc) && canDiag(r, c, r + dr, c + dc)) reg(r + dr, c + dc);
-      });
-    } else if (type === 'po') {
-      [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dr, dc]) => {
+      } else if (inPalace(r, c)) {
+        const cr = r < 5 ? 1 : 8, dr = Math.sign(cr - r), dc = Math.sign(4 - c);
+        if (dr !== 0 && dc !== 0) { let nr = r + dr, nc = c + dc; while (inPalace(nr, nc)) { if (!add(nr, nc)) break; nr += dr; nc += dc; } }
+      }
+    }
+
+    // 2. 포(包)
+    if (piece.type === 'cannon') {
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
         let jumped = false;
         for (let i = 1; i < 10; i++) {
-          const nr = r + dr * i, nc = c + dc * i;
-          if (!ok(nr, nc)) break;
-          const t = board[toI(nr, nc)];
+          const nr = r + dr * i, nc = c + dc * i; if (!ok(nr, nc)) break;
+          const t = state[nr * COLS + nc];
           if (!jumped) {
-            if (t) { if (t.type === 'po') break; jumped = true; }
+            if (t) { if (t.type === 'cannon') break; jumped = true; }
           } else {
-            if (t) { if (t.team === enemy && t.type !== 'po') caps.push(toI(nr, nc)); break; }
-            moves.push(toI(nr, nc));
+            if (!t) moves.push(nr * COLS + nc);
+            else { if (t.color !== piece.color && t.type !== 'cannon') caps.push(nr * COLS + nc); break; }
           }
         }
       });
-    } else if (type === 'zol') {
-      [[1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => reg(r + dr, c + dc));
-    } else if (type === 'bing') {
-      [[-1, 0], [0, 1], [0, -1]].forEach(([dr, dc]) => reg(r + dr, c + dc));
+      if (inPalace(r, c) && !isCenter(r, c)) {
+        const cr = r < 5 ? 1 : 8; const centerPiece = state[cr * COLS + 4];
+        if (centerPiece && centerPiece.type !== 'cannon') {
+          const oppR = cr + (cr - r), oppC = 4 + (4 - c); const dest = state[oppR * COLS + oppC];
+          if (!dest) moves.push(oppR * COLS + oppC);
+          else if (dest.color !== piece.color && dest.type !== 'cannon') caps.push(oppR * COLS + oppC);
+        }
+      }
+    }
+
+    // 3. 마(馬)
+    if (piece.type === 'knight') {
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+        if (ok(r + dr, c + dc) && !state[(r + dr) * COLS + (c + dc)]) {
+          if (dr !== 0) { add(r + dr * 2, c - 1); add(r + dr * 2, c + 1); } else { add(r - 1, c + dc * 2); add(r + 1, c + dc * 2); }
+        }
+      });
+    }
+
+    // 4. 상(象)
+    if (piece.type === 'elephant') {
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+        if (ok(r + dr, c + dc) && !state[(r + dr) * COLS + (c + dc)]) {
+          if (dr !== 0) {
+            if (ok(r + dr * 2, c - 1) && !state[(r + dr * 2) * COLS + (c - 1)]) add(r + dr * 3, c - 2);
+            if (ok(r + dr * 2, c + 1) && !state[(r + dr * 2) * COLS + (c + 1)]) add(r + dr * 3, c + 2);
+          } else {
+            if (ok(r - 1, c + dc * 2) && !state[(r - 1) * COLS + (c + dc * 2)]) add(r - 2, c + dc * 3);
+            if (ok(r + 1, c + dc * 2) && !state[(r + 1) * COLS + (c + dc * 2)]) add(r + 2, c + dc * 3);
+          }
+        }
+      });
+    }
+
+    // 5. 왕 & 사
+    if (piece.type === 'king' || piece.type === 'guard') {
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => { if (inPalace(r + dr, c + dc)) add(r + dr, c + dc); });
+      if (isCenter(r, c)) {
+        [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([dr, dc]) => add(r + dr, c + dc));
+      } else if (inPalace(r, c)) {
+        add(r < 5 ? 1 : 8, 4);
+      }
+    }
+
+    // 6. 졸/병
+    if (piece.type === 'pawn') {
+      const dir = piece.color === 'cho' ? 1 : -1;
+      add(r + dir, c); add(r, c - 1); add(r, c + 1);
+      if (inPalace(r, c)) {
+        if (isCenter(r, c)) { add(r + dir, c - 1); add(r + dir, c + 1); }
+        else if (c === 3 || c === 5) { if ((dir === 1 && r < 1) || (dir === -1 && r > 8)) add(r + dir, 4); }
+      }
     }
 
     return { moves, caps };
-  }, [board]);
+  }, []);
 
-  const handleSquareClick = (index: number) => {
-    const clickedPiece = board[index];
+  const startTutorial = () => {
+    setGameMode('tutorial');
+    setGameOver(false);
+    setBoard(makeSetup());
+    setTurn('');
+    setTutorialText("연습 모드! 초록색 팀(초)과 빨간색 팀(한) 모두 만져볼 수 있어요!");
+    setSelIdx(null);
+    setMoveCells([]);
+    setCapCells([]);
+  };
 
-    if (selectedIdx !== null) {
-      if (index === selectedIdx) {
-        setSelectedIdx(null);
-        setMoveCells([]);
-        setCapCells([]);
-        setTutorialText('다른 장기 친구를 선택해 보세요!');
-        return;
-      }
+  const startMatch = (diff: string) => {
+    setGameMode('match');
+    setGameDiff(diff);
+    setGameOver(false);
+    setTurn('cho');
+    setBoard(makeSetup());
+    setTutorialText("컴퓨터 대결 시작! 아들 차례 — 초록색(초) 말을 먼저 움직여!");
+    setSelIdx(null);
+    setMoveCells([]);
+    setCapCells([]);
+    setShowDiffOptions(false);
+  };
 
-      if (moveCells.includes(index)) {
-        setTutorialText('스르륵~ 이동 완료! ✨');
-        executeMove(selectedIdx, index, false);
-        return;
-      }
+  const goToMenu = () => {
+    setGameOver(true);
+    setGameMode('none');
+    setShowDiffOptions(false);
+    setTutorialText("모드를 골라주세요!");
+    setSelIdx(null);
+    setMoveCells([]);
+    setCapCells([]);
+  };
 
-      if (capCells.includes(index)) {
-        const target = board[index];
-        if (target) {
-          setTutorialText(`얍! 적군 ${target.text}을(를) 물리쳤어요! 🎉`);
-          setCapturedPiece({ piece: target, index });
-          if (captureSoundRef.current) {
-            captureSoundRef.current.currentTime = 0;
-            captureSoundRef.current.play().catch(() => {});
-          }
-          if (navigator.vibrate) navigator.vibrate(200);
+  const clearSel = () => {
+    setSelIdx(null);
+    setMoveCells([]);
+    setCapCells([]);
+  };
+
+  const selectPiece = (idx: number) => {
+    const piece = board[idx];
+    if (!piece) return;
+    setSelIdx(idx);
+    setTutorialText(piece.desc);
+    const { moves, caps } = calcMoves(idx, board);
+    setMoveCells(moves);
+    setCapCells(caps);
+  };
+
+  const afterMove = (to: number, isPlayer: boolean, captured: PieceData | null) => {
+    if (captured && captured.type === 'king') {
+      const winner = isPlayer ? '초나라(초록팀, 아들)' : '한나라(빨간팀, 컴퓨터)';
+      setGameOver(true);
+      setTutorialText(`🎉 게임 종료! ${winner} 승리! 🎉`);
+      setTimeout(() => {
+        if (confirm(`외통수! ${winner} 승리!\n메뉴로 돌아갈까요?`)) {
+          goToMenu();
         }
-        executeMove(selectedIdx, index, true);
-        return;
-      }
+      }, 400);
+      return;
+    }
 
-      setTutorialText('거기는 갈 수 없어! 초록 불빛을 따라가봐! 🟢');
-    } else {
-      if (clickedPiece) {
-        setSelectedIdx(index);
-        const { moves, caps } = calcMoves(index, clickedPiece.type, clickedPiece.team);
-        setMoveCells(moves);
-        setCapCells(caps);
-        setTutorialText(clickedPiece.desc);
+    if (gameMode === 'match') {
+      if (isPlayer) {
+        setTurn('han');
+        setTutorialText("컴퓨터 로봇이 생각 중... 🤔");
+      } else {
+        setTurn('cho');
+        setTutorialText("아들 차례! 멋지게 공격해봐요!");
       }
     }
   };
 
-  const executeMove = (from: number, to: number, isCapture: boolean) => {
-    const movingPiece = board[from];
-    const targetPiece = board[to];
-
+  const doMove = (from: number, to: number, isPlayer: boolean) => {
     const newBoard = [...board];
-    newBoard[to] = movingPiece;
+    newBoard[to] = newBoard[from];
     newBoard[from] = null;
-
     setBoard(newBoard);
-    setSelectedIdx(null);
-    setMoveCells([]);
-    setCapCells([]);
+    clearSel();
+    setTimeout(() => afterMove(to, isPlayer, null), 300);
+  };
 
-    if (isCapture && targetPiece?.type === 'king') {
-      const winner = movingPiece?.team === 'cho' ? '초나라(파란색)' : '한나라(빨간색)';
-      setTimeout(() => {
-        setTutorialText(`🎉 ${winner} 팀 승리! 🎉`);
-        alert(`외통수! ${winner}의 승리!`);
-      }, 400);
+  const doCapture = (from: number, to: number, isPlayer: boolean) => {
+    const targetData = board[to];
+    setCapturingIdx(to);
+    setTimeout(() => {
+      const newBoard = [...board];
+      newBoard[to] = newBoard[from];
+      newBoard[from] = null;
+      setBoard(newBoard);
+      setCapturingIdx(null);
+      clearSel();
+      setTimeout(() => afterMove(to, isPlayer, targetData), 300);
+    }, 300);
+  };
+
+  const computerMove = useCallback(() => {
+    if (gameMode !== 'match' || gameOver || turn !== 'han') return;
+
+    const all: { from: number; to: number; capVal: number; isCapture: boolean; score?: number }[] = [];
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      if (!board[i] || board[i]?.color !== 'han') continue;
+      const { moves, caps } = calcMoves(i, board);
+      moves.forEach(to => all.push({ from: i, to, capVal: 0, isCapture: false }));
+      caps.forEach(to => {
+        const target = board[to];
+        if (target) {
+          all.push({ from: i, to, capVal: PIECE_VALUE[target.type] || 0, isCapture: true });
+        }
+      });
     }
 
-    if (isCapture) {
-      setTimeout(() => setCapturedPiece(null), 400);
+    if (all.length === 0) {
+      setGameOver(true);
+      setTutorialText("컴퓨터가 움직일 곳이 없어요! 아들 승리! 🎉");
+      return;
+    }
+
+    let chosen: any = null;
+    if (gameDiff === 'level1') {
+      chosen = all[Math.floor(Math.random() * all.length)];
+    } else if (gameDiff === 'level2') {
+      const caps = all.filter(m => m.isCapture);
+      chosen = caps.length && Math.random() > 0.5 ? caps[Math.floor(Math.random() * caps.length)] : all[Math.floor(Math.random() * all.length)];
+    } else if (gameDiff === 'level3') {
+      const maxV = Math.max(...all.map(m => m.capVal));
+      const best = all.filter(m => m.capVal === maxV);
+      chosen = best[Math.floor(Math.random() * best.length)];
+    } else if (gameDiff === 'level4' || gameDiff === 'level5') {
+      const scored = all.map(m => {
+        const r = Math.floor(m.to / COLS), c = m.to % COLS;
+        const centerBonus = 10 - (Math.abs(r - 4.5) + Math.abs(c - 4));
+        const movingPieceVal = PIECE_VALUE[board[m.from]!.type];
+
+        let score = (m.capVal * 1000) + (centerBonus * 2);
+
+        // 5단계 전용: 현재 내 기물이 위험에 처해있었다면 탈출 보너스
+        if (gameDiff === 'level5') {
+          let currentlyAttacked = false;
+          for (let j = 0; j < BOARD_SIZE; j++) {
+            if (board[j] && board[j]?.color === 'cho') {
+              const { moves: wm, caps: wc } = calcMoves(j, board);
+              if ([...wm, ...wc].includes(m.from)) {
+                currentlyAttacked = true;
+                break;
+              }
+            }
+          }
+          if (currentlyAttacked) score += movingPieceVal * 500;
+        }
+
+        // 가상 이동 시뮬레이션 (이동할 자리가 안전한지 확인)
+        const sim = [...board];
+        sim[m.to] = sim[m.from];
+        sim[m.from] = null;
+
+        let destAttacked = false;
+        for (let j = 0; j < BOARD_SIZE; j++) {
+          if (sim[j] && sim[j]?.color === 'cho') {
+            const { moves: wm, caps: wc } = calcMoves(j, sim);
+            if ([...wm, ...wc].includes(m.to)) {
+              destAttacked = true;
+              break;
+            }
+          }
+        }
+
+        // 이동할 자리가 공격받는 자리라면 기물 가치만큼 감점 (단, 왕을 잡는 경우는 예외)
+        if (destAttacked && m.capVal < 1000) {
+          score -= movingPieceVal * 1000;
+        }
+
+        return { ...m, score };
+      });
+      const maxS = Math.max(...scored.map(m => m.score!));
+      const best = scored.filter(m => m.score === maxS);
+      chosen = best[Math.floor(Math.random() * best.length)];
+    }
+
+    if (chosen.isCapture) doCapture(chosen.from, chosen.to, false);
+    else doMove(chosen.from, chosen.to, false);
+  }, [gameMode, gameOver, turn, board, gameDiff, calcMoves]);
+
+  useEffect(() => {
+    if (turn === 'han' && !gameOver) {
+      const timer = setTimeout(computerMove, 750);
+      return () => clearTimeout(timer);
+    }
+  }, [turn, gameOver, computerMove]);
+
+  const onSquareClick = (idx: number) => {
+    if (gameOver) return;
+    if (gameMode === 'match' && turn !== 'cho') return;
+
+    const clicked = board[idx];
+
+    if (selIdx !== null) {
+      if (idx === selIdx) { clearSel(); return; }
+      if (clicked && clicked.color === board[selIdx]?.color) {
+        clearSel();
+        selectPiece(idx);
+        return;
+      }
+
+      if (moveCells.includes(idx)) doMove(selIdx, idx, true);
+      else if (capCells.includes(idx)) doCapture(selIdx, idx, true);
+      else setTutorialText("거긴 못 가! 초록 불빛을 눌러!");
+    } else {
+      if (!clicked) return;
+      if (gameMode === 'match' && clicked.color !== 'cho') {
+        setTutorialText("아들 차례니까 초록 말만 움직여!");
+        return;
+      }
+      selectPiece(idx);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen select-none overflow-hidden">
-      <div ref={topUiRef} className="flex flex-col items-center gap-2 mb-2">
-        <h1 className="text-3xl font-black text-[#3a1a00] tracking-tight drop-shadow-sm">🀄 레고 장기 교실</h1>
-        <button 
-          onClick={toggleBgm}
-          className={`px-6 py-1.5 rounded-2xl text-white font-bold shadow-md transition-all active:scale-95 ${
-            isPlayingBgm ? 'bg-green-600' : 'bg-[#c0392b]'
-          }`}
+    <div className="lego-chess-container select-none">
+      <div className="top-bar">
+        <button className="menu-back-btn" onClick={goToMenu}>🏠 메뉴로 가기</button>
+        <h1 className="game-title">장기 마스터</h1>
+      </div>
+
+      <div className="music-controls">
+        <select 
+          id="bgm-select" 
+          className="bgm-select"
+          value={curVideoId}
+          onChange={(e) => setCurVideoId(e.target.value)}
         >
-          {isPlayingBgm ? '🔇 구구단송 끄기' : '🎵 구구단송 켜기'}
+          <option value="iQIkgz9P-nM">🎵 신나는 구구단송</option>
+          <option value="SEwmVVhlqyg">🎻 똑똑해지는 모차르트</option>
+        </select>
+        <button 
+          id="bgm-btn" 
+          className="bgm-btn"
+          onClick={toggleBgm}
+          style={{ backgroundColor: bgmActive ? '#4CAF50' : 'var(--lego-red)' }}
+        >
+          {bgmActive ? '🔇 음악 끄기' : '▶ 음악 켜기'}
         </button>
       </div>
 
-      <div id="youtube-player" className="hidden"></div>
-      <audio ref={captureSoundRef} src="https://assets.mixkit.co/active_storage/sfx/3005/3005-preview.mp3" preload="auto" />
+      <div id="youtube-player" style={{ display: 'none' }}></div>
 
-      <div className="janggi-board-refined">
-        {/* SVG Background */}
-        <svg className="absolute inset-0 w-full h-full z-0 pointer-events-none" viewBox="0 0 900 1000" preserveAspectRatio="none">
-          <g stroke="#5c3a21" strokeWidth="1.8">
-            <line x1="50" y1="50"  x2="850" y2="50"/>
-            <line x1="50" y1="150" x2="850" y2="150"/>
-            <line x1="50" y1="250" x2="850" y2="250"/>
-            <line x1="50" y1="350" x2="850" y2="350"/>
-            <line x1="50" y1="450" x2="850" y2="450"/>
-            <line x1="50" y1="550" x2="850" y2="550"/>
-            <line x1="50" y1="650" x2="850" y2="650"/>
-            <line x1="50" y1="750" x2="850" y2="750"/>
-            <line x1="50" y1="850" x2="850" y2="850"/>
-            <line x1="50" y1="950" x2="850" y2="950"/>
-          </g>
-          <g stroke="#5c3a21" strokeWidth="1.8">
-            <line x1="50"  y1="50" x2="50"  y2="950"/>
-            <line x1="150" y1="50" x2="150" y2="950"/>
-            <line x1="250" y1="50" x2="250" y2="950"/>
-            <line x1="350" y1="50" x2="350" y2="950"/>
-            <line x1="450" y1="50" x2="450" y2="950"/>
-            <line x1="550" y1="50" x2="550" y2="950"/>
-            <line x1="650" y1="50" x2="650" y2="950"/>
-            <line x1="750" y1="50" x2="750" y2="950"/>
-            <line x1="850" y1="50" x2="850" y2="950"/>
-          </g>
-          <rect x="350" y="50" width="200" height="200" fill="none" stroke="#4060a0" strokeWidth="2.5" strokeDasharray="8,4" opacity="0.6"/>
-          <line x1="350" y1="50"  x2="550" y2="250" stroke="#4060a0" strokeWidth="2" opacity="0.8"/>
-          <line x1="550" y1="50"  x2="350" y2="250" stroke="#4060a0" strokeWidth="2" opacity="0.8"/>
-          <rect x="350" y="50" width="200" height="200" fill="rgba(100,140,220,0.08)" stroke="none"/>
-          <rect x="350" y="750" width="200" height="200" fill="none" stroke="#a04040" strokeWidth="2.5" strokeDasharray="8,4" opacity="0.6"/>
-          <line x1="350" y1="750" x2="550" y2="950" stroke="#a04040" strokeWidth="2" opacity="0.8"/>
-          <line x1="550" y1="750" x2="350" y2="950" stroke="#a04040" strokeWidth="2" opacity="0.8"/>
-          <rect x="350" y="750" width="200" height="200" fill="rgba(220,100,100,0.08)" stroke="none"/>
-          <rect x="52" y="452" width="796" height="96" fill="rgba(100,160,220,0.10)" stroke="none"/>
-          <line x1="50" y1="500" x2="850" y2="500" stroke="#4a90c4" strokeWidth="1.2" strokeDasharray="12,8" opacity="0.5"/>
-          <text x="230" y="508" fontSize="28" fill="#2255aa" opacity="0.55" fontWeight="bold" textAnchor="middle" dominantBaseline="middle" fontFamily="serif">楚　河</text>
-          <text x="670" y="508" fontSize="28" fill="#aa2222" opacity="0.55" fontWeight="bold" textAnchor="middle" dominantBaseline="middle" fontFamily="serif">漢　界</text>
-        </svg>
-
-        {/* Click Grid */}
-        <div className="grid grid-cols-9 grid-rows-10 absolute inset-0 z-20">
-          {Array.from({ length: BOARD_SIZE }).map((_, i) => (
-            <div 
-              key={i}
-              onClick={() => handleSquareClick(i)}
-              className={`relative cursor-pointer transition-colors duration-200 ${
-                moveCells.includes(i) ? 'valid-move-indicator-refined' : ''
-              } ${capCells.includes(i) ? 'capture-target-indicator' : ''}`}
-            />
-          ))}
-        </div>
-
-        {/* Pieces Layer */}
-        <div className="absolute inset-0 pointer-events-none z-10">
-          <AnimatePresence>
-            {board.map((piece, i) => {
-              if (!piece) return null;
-              const r = Math.floor(i / COLS), c = i % COLS;
-              const isSelected = selectedIdx === i;
-
-              return (
-                <motion.div
-                  key={piece.id}
-                  layoutId={piece.id}
-                  initial={false}
-                  animate={{
-                    x: `calc(${c} * var(--cell-size) + var(--piece-offset))`,
-                    y: `calc(${r} * var(--cell-size) + var(--piece-offset))`,
-                    scale: isSelected ? 1.15 : 1,
-                  }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
-                  className={`piece-refined ${piece.team} ${piece.type === 'king' ? 'king' : ''} ${isSelected ? 'selected' : ''}`}
-                >
-                  {piece.text}
-                </motion.div>
-              );
-            })}
-            {capturedPiece && (
-              <motion.div
-                key={`cap-${capturedPiece.piece.id}`}
-                initial={{ opacity: 1, scale: 1, rotate: 0 }}
-                animate={{ opacity: 0, scale: 0, rotate: 360 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35 }}
-                className={`piece-refined ${capturedPiece.piece.team} ${capturedPiece.piece.type === 'king' ? 'king' : ''} z-30`}
-                style={{
-                  left: `calc(${capturedPiece.index % COLS} * var(--cell-size) + var(--piece-offset))`,
-                  top: `calc(${Math.floor(capturedPiece.index / COLS)} * var(--cell-size) + var(--piece-offset))`,
-                }}
-              >
-                {capturedPiece.piece.text}
-              </motion.div>
+      <div id="board" className="lego-board" ref={boardRef}>
+        {gameMode === 'none' && (
+          <div id="menu-overlay" className="menu-overlay">
+            <div className="menu-title">어떤 모드로 해볼까?</div>
+            {!showDiffOptions ? (
+              <>
+                <button className="menu-btn" onClick={startTutorial}>1. 튜토리얼 (혼자 연습하기)</button>
+                <button className="menu-btn" onClick={() => setShowDiffOptions(true)}>2. 컴퓨터랑 대결하기</button>
+              </>
+            ) : (
+              <div id="diff-options" className="diff-container" style={{ display: 'flex' }}>
+                <button className="diff-btn" style={{ backgroundColor: '#8bc34a' }} onClick={() => startMatch('level1')}>1단계: 입문 (랜덤 로봇)</button>
+                <button className="diff-btn" style={{ backgroundColor: '#ffca28', color: '#333' }} onClick={() => startMatch('level2')}>2단계: 초급 (변덕쟁이)</button>
+                <button className="diff-btn" style={{ backgroundColor: '#ff9800' }} onClick={() => startMatch('level3')}>3단계: 중급 (먹보 로봇)</button>
+                <button className="diff-btn" style={{ backgroundColor: '#f44336' }} onClick={() => startMatch('level4')}>4단계: 고급 (전략가 로봇)</button>
+                <button className="diff-btn" style={{ backgroundColor: '#9c27b0' }} onClick={() => startMatch('level5')}>5단계: 마스터 (예언자 로봇)</button>
+                <button className="menu-btn mt-4" onClick={() => setShowDiffOptions(false)}>뒤로 가기</button>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+          </div>
+        )}
+
+        {Array.from({ length: BOARD_SIZE }).map((_, i) => {
+          const r = Math.floor(i / COLS);
+          const c = i % COLS;
+          let palaceClass = '';
+          if ((r >= 0 && r <= 2) || (r >= 7 && r <= 9)) {
+            if (c >= 3 && c <= 5) {
+              if (r === 0 || r === 7) palaceClass += ' palace-top';
+              if (r === 2 || r === 9) palaceClass += ' palace-bottom';
+              if (c === 3) palaceClass += ' palace-left';
+              if (c === 5) palaceClass += ' palace-right';
+            }
+          }
+
+          return (
+            <div 
+              key={i} 
+              className={`square ${palaceClass} ${moveCells.includes(i) ? 'valid-move' : ''} ${capCells.includes(i) ? 'capture-move' : ''}`}
+              onClick={() => onSquareClick(i)}
+            >
+              {board[i] && (
+                <div 
+                  className={`piece ${board[i]?.color} ${selIdx === i ? 'selected' : ''} ${capturingIdx === i ? 'being-captured' : ''}`}
+                  style={{
+                    transform: `translate(0, 0)` // React handles rendering, CSS handles grid
+                  }}
+                >
+                  {board[i]?.emoji}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <motion.div 
-        ref={tutorialBoxRef}
-        key={tutorialText}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mt-2 p-3 bg-gradient-to-br from-[#fffde7] to-[#fff9c4] border-2 border-dashed border-[#f0a000] rounded-2xl text-lg text-center shadow-md flex items-center justify-center gap-2 text-gray-800"
-        style={{ width: `calc(${cellSize} * 9)` }}
-      >
-        <Info className="text-[#f0a000]" size={20} />
-        {tutorialText}
-      </motion.div>
+      <p id="tutorial-box" className="tutorial-box">{tutorialText}</p>
     </div>
   );
 }
