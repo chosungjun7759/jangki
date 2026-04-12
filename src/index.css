@@ -7,7 +7,8 @@ body { background-color: #f4f4f4; overflow: hidden; display: flex; flex-directio
 .top-bar { display: flex; width: 95%; max-width: 600px; justify-content: space-between; align-items: center; margin-bottom: 1vh; }
 .game-title { color: var(--lego-red); font-size: clamp(16px, 5vmin, 28px); font-weight: 900; margin: 0; text-shadow: 0.2vmin 0.2vmin 0 white; }
 
-.btn-group { display: flex; gap: 1vmin; }
+.btn-group { display: flex; gap: 1vmin; align-items: center; }
+.bgm-select { padding: 0.8vmin 1vmin; font-size: clamp(11px, 2.3vmin, 15px); border-radius: 1vmin; border: 0.2vmin solid var(--lego-red); font-weight: bold; outline: none; }
 .action-btn { padding: 1vmin 2vmin; font-size: clamp(11px, 2.5vmin, 15px); color: white; border: none; border-radius: 1vmin; font-weight: bold; cursor: pointer; box-shadow: 0.3vmin 0.3vmin 1vmin rgba(0,0,0,0.2); transition: transform 0.1s; }
 .action-btn:active { transform: scale(0.95); }
 .bgm-btn { background-color: #4CAF50; }
@@ -15,7 +16,6 @@ body { background-color: #f4f4f4; overflow: hidden; display: flex; flex-directio
 
 .tutorial-box { margin-top: 1vh; padding: 1.2vmin 2vmin; background-color: #fffde7; border: 0.5vmin dashed #fbc02d; border-radius: 2vmin; font-size: clamp(12px, 2.8vmin, 18px); text-align: center; width: 95%; max-width: 600px; min-height: 5vh; color: #333; font-weight: bold; transition: all 0.3s; white-space: pre-line; }
 .tutorial-box.check-alert { background-color: #ffebee; border-color: #f44336; color: #d32f2f; transform: scale(1.05); }
-.tutorial-box.draw-alert { background-color: #e3f2fd; border-color: #2196f3; color: #1565c0; transform: scale(1.05); }
 
 .lego-board-wrapper { background-color: var(--lego-board-light); padding: calc(var(--square-size) * 0.6); border: 1vmin solid var(--lego-red); border-radius: 1vmin; box-shadow: 0.5vmin 0.5vmin 2vmin rgba(0,0,0,0.4); }
 .lego-board { position: relative; width: calc(var(--square-size) * 8); height: calc(var(--square-size) * 9); }
