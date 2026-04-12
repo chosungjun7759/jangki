@@ -1,148 +1,42 @@
 @import "tailwindcss";
 
-:root {
-  --lego-red: #8b4513;
-  --lego-board-light: #eab46b;
-  --square-size: 60px; /* Default, will be overridden by fitBoard */
-}
-
+:root { --lego-red: #8b4513; --lego-board-light: #eab46b; --square-size: 60px; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background-color: #f4f4f4; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100dvh; font-family: 'Apple SD Gothic Neo', '맑은 고딕', sans-serif; touch-action: none; }
+.lego-chess-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.top-bar { display: flex; width: 95%; max-width: 600px; justify-content: space-between; align-items: center; margin-bottom: 1vh; }
+.game-title { color: var(--lego-red); font-size: clamp(16px, 5vmin, 28px); font-weight: 900; margin: 0; text-shadow: 0.2vmin 0.2vmin 0 white; }
 
-body {
-  background-color: #f4f4f4;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100dvh;
-  font-family: 'Apple SD Gothic Neo', '맑은 고딕', 'Noto Sans KR', sans-serif;
-  touch-action: none;
-}
+.btn-group { display: flex; gap: 1vmin; }
+.action-btn { padding: 1vmin 2vmin; font-size: clamp(11px, 2.5vmin, 15px); color: white; border: none; border-radius: 1vmin; font-weight: bold; cursor: pointer; box-shadow: 0.3vmin 0.3vmin 1vmin rgba(0,0,0,0.2); transition: transform 0.1s; }
+.action-btn:active { transform: scale(0.95); }
+.bgm-btn { background-color: #4CAF50; }
+.menu-back-btn { background-color: #607d8b; }
 
-.lego-chess-container {
-  display: flex; flex-direction: column; align-items: center; width: 100%;
-}
+.tutorial-box { margin-top: 1vh; padding: 1.2vmin 2vmin; background-color: #fffde7; border: 0.5vmin dashed #fbc02d; border-radius: 2vmin; font-size: clamp(12px, 2.8vmin, 18px); text-align: center; width: 95%; max-width: 600px; min-height: 5vh; color: #333; font-weight: bold; transition: all 0.3s; white-space: pre-line; }
+.tutorial-box.check-alert { background-color: #ffebee; border-color: #f44336; color: #d32f2f; transform: scale(1.05); }
+.tutorial-box.draw-alert { background-color: #e3f2fd; border-color: #2196f3; color: #1565c0; transform: scale(1.05); }
 
-.top-bar {
-  display: flex; width: 95%; max-width: 600px; justify-content: space-between; align-items: center; margin-bottom: 1vh;
-}
+.lego-board-wrapper { background-color: var(--lego-board-light); padding: calc(var(--square-size) * 0.6); border: 1vmin solid var(--lego-red); border-radius: 1vmin; box-shadow: 0.5vmin 0.5vmin 2vmin rgba(0,0,0,0.4); }
+.lego-board { position: relative; width: calc(var(--square-size) * 8); height: calc(var(--square-size) * 9); }
 
-.game-title {
-  color: var(--lego-red); font-size: clamp(16px, 5vmin, 28px); font-weight: 900; margin: 0;
-  text-shadow: 0.2vmin 0.2vmin 0 white;
-}
+.intersection { position: absolute; width: calc(var(--square-size) * 1.1); height: calc(var(--square-size) * 1.1); transform: translate(-50%, -50%); border-radius: 50%; cursor: pointer; z-index: 30; -webkit-tap-highlight-color: transparent; }
+.intersection.valid-move::before { content: ''; position: absolute; top: 50%; left: 50%; width: 25%; height: 25%; transform: translate(-50%, -50%); background-color: rgba(76, 175, 80, 0.9); border: 0.3vmin solid white; border-radius: 50%; pointer-events: none; }
+.intersection.capture-move::after { content: ''; position: absolute; top: 50%; left: 50%; width: 85%; height: 85%; transform: translate(-50%, -50%); border: 0.8vmin solid #ff1744; border-radius: 50%; background-color: rgba(255, 23, 68, 0.25); box-shadow: 0 0 1.5vmin #ff1744; pointer-events: none; }
 
-.menu-back-btn {
-  padding: 1vmin 2vmin; font-size: clamp(12px, 2.5vmin, 16px); background-color: #607d8b;
-  color: white; border: none; border-radius: 1vmin; font-weight: bold; cursor: pointer;
-  box-shadow: 0.3vmin 0.3vmin 1vmin rgba(0,0,0,0.2);
-  transition: transform 0.1s;
-}
-.menu-back-btn:active { transform: scale(0.95); }
-
-.tutorial-box {
-  margin-top: 1vh; padding: 1.2vmin 2vmin; background-color: #fffde7; border: 0.5vmin dashed #fbc02d;
-  border-radius: 2vmin; font-size: clamp(12px, 2.8vmin, 18px); text-align: center;
-  width: 95%; max-width: 600px; min-height: 5vh; color: #333; font-weight: bold;
-  white-space: pre-line;
-}
-
-.lego-board-wrapper {
-  background-color: var(--lego-board-light);
-  padding: calc(var(--square-size) * 0.6);
-  border: 1vmin solid var(--lego-red);
-  border-radius: 1vmin;
-  box-shadow: 0.5vmin 0.5vmin 2vmin rgba(0,0,0,0.4);
-}
-
-.lego-board {
-  position: relative;
-  width: calc(var(--square-size) * 8);
-  height: calc(var(--square-size) * 9);
-}
-
-.intersection {
-  position: absolute;
-  width: calc(var(--square-size) * 0.9);
-  height: calc(var(--square-size) * 0.9);
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 5;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.intersection.valid-move::before {
-  content: ''; position: absolute; top: 50%; left: 50%;
-  width: 35%; height: 35%; transform: translate(-50%, -50%);
-  background-color: rgba(76, 175, 80, 0.9); border: 0.3vmin solid white;
-  border-radius: 50%; pointer-events: none; z-index: 15;
-}
-
-.intersection.capture-move::before {
-  content: ''; position: absolute; top: 50%; left: 50%;
-  width: 80%; height: 80%; transform: translate(-50%, -50%);
-  border: 0.6vmin solid rgba(220, 53, 69, 0.9); border-radius: 10%;
-  pointer-events: none; z-index: 15;
-}
-
-.piece-wrapper {
-  position: absolute; top: 0; left: 0;
-  width: calc(var(--square-size) * 0.9);
-  height: calc(var(--square-size) * 0.9);
-  filter: drop-shadow(0.2vmin 0.3vmin 0.3vmin rgba(0,0,0,0.4));
-  transition: transform 0.25s ease-in-out;
-  z-index: 10; pointer-events: none;
-}
-
-.piece {
-  width: 100%; height: 100%;
-  background-color: #fdfdfd;
-  clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
-  display: flex; justify-content: center; align-items: center;
-  font-weight: 900; font-family: "Gungsuh", "궁서", serif;
-  font-size: calc(var(--square-size) * 0.55);
-  user-select: none;
-}
-
+.piece-wrapper { position: absolute; top: 0; left: 0; width: calc(var(--square-size) * 0.9); height: calc(var(--square-size) * 0.9); filter: drop-shadow(0.2vmin 0.3vmin 0.3vmin rgba(0,0,0,0.4)); transition: transform 0.25s ease-in-out; z-index: 10; pointer-events: none; }
+.piece { width: 100%; height: 100%; background-color: #fdfdfd; clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%); display: flex; justify-content: center; align-items: center; font-weight: 900; font-family: "Gungsuh", "궁서", serif; font-size: calc(var(--square-size) * 0.55); user-select: none; }
 .piece-wrapper.cho .piece { color: #2e7d32; }
 .piece-wrapper.han .piece { color: #d32f2f; }
+.piece-wrapper.selected { filter: drop-shadow(0 0 1.5vmin rgba(255, 235, 59, 1)); z-index: 20; }
 
-.piece-wrapper.selected {
-  filter: drop-shadow(0 0 1.5vmin rgba(255, 235, 59, 1)); z-index: 20;
-}
-
-.menu-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background-color: rgba(255,255,255,0.96);
-  z-index: 100; display: flex; flex-direction: column;
-  justify-content: center; align-items: center;
-}
-
-.menu-title { font-size: clamp(18px, 5vmin, 30px); color: var(--lego-red); margin-bottom: 2vh; font-weight: bold; }
-.menu-btn {
-  width: 85%; max-width: 400px; padding: 2vh; margin-bottom: 1.5vh;
-  font-size: clamp(14px, 3.5vmin, 22px); font-weight: bold;
-  background-color: #fbc02d; border: 0.5vmin solid #f57f17;
-  border-radius: 2vmin; cursor: pointer; transition: transform 0.1s;
-}
+.menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.96); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.menu-title { font-size: clamp(18px, 5vmin, 30px); color: var(--lego-red); margin-bottom: 2vh; font-weight: bold; text-align: center; }
+.menu-btn { width: 85%; max-width: 400px; padding: 2vh; margin-bottom: 1.5vh; font-size: clamp(14px, 3.5vmin, 22px); font-weight: bold; background-color: #fbc02d; border: 0.5vmin solid #f57f17; border-radius: 2vmin; cursor: pointer; transition: transform 0.1s; }
 .menu-btn:active { transform: scale(0.95); }
-
 .diff-container { display: none; flex-direction: column; width: 85%; max-width: 400px; }
-.diff-btn {
-  padding: 1.5vh; margin-bottom: 1vh; font-size: clamp(13px, 3vmin, 18px);
-  color: white; border: none; border-radius: 2vmin; cursor: pointer; font-weight: bold;
-}
+.diff-btn { padding: 1.5vh; margin-bottom: 1vh; font-size: clamp(13px, 3vmin, 18px); color: white; border: none; border-radius: 2vmin; cursor: pointer; font-weight: bold; transition: transform 0.1s; }
 .diff-btn:active { transform: scale(0.95); }
 
-@keyframes captureAnim {
-  0%   { transform: scale(1)   rotate(0);     opacity: 1; }
-  50%  { transform: scale(1.3) rotate(180deg); opacity: 0.6; }
-  100% { transform: scale(0)   rotate(360deg); opacity: 0; }
-}
-.piece-wrapper.being-captured {
-  animation: captureAnim 0.3s ease-out forwards;
-  z-index: 25;
-  transition: none !important;
-}
+@keyframes captureAnim { 0% { transform: scale(1) rotate(0); opacity: 1; } 50% { transform: scale(1.3) rotate(180deg); opacity: 0.6; } 100% { transform: scale(0) rotate(360deg); opacity: 0; } }
+.piece-wrapper.being-captured { animation: captureAnim 0.32s ease-out forwards; z-index: 25; transition: none !important; }
