@@ -9,6 +9,12 @@ interface PieceData {
   color: Team;
 }
 
+interface MoveOption {
+  from: number;
+  to: number;
+  isCapture: boolean;
+}
+
 type BoardState = (PieceData | null)[];
 
 const ROWS = 10;
@@ -30,6 +36,8 @@ const DESC: Record<Team, Record<PieceType, string>> = {
   han: { rook: "차(車)", knight: "마(馬)", elephant: "상(象)", cannon: "포(包)", guard: "사(士)", king: "한(漢)", pawn: "병(兵)" }
 };
 
+const DEFAULT_VIDEO_ID = 'iQIkgz9P-nM';
+
 const App: React.FC = () => {
   const [board, setBoard] = useState<BoardState>(Array(BOARD_SIZE).fill(null));
   const [selIdx, setSelIdx] = useState<number | null>(null);
@@ -39,21 +47,21 @@ const App: React.FC = () => {
   const [gameDiff, setGameDiff] = useState<string>('level1');
   const [turn, setTurn] = useState<Team | ''>('');
   const [gameOver, setGameOver] = useState(false);
+  const [resultText, setResultText] = useState('');
   const [tutorialText, setTutorialText] = useState("모드를 골라주세요!");
   const [showDiffOptions, setShowDiffOptions] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [capturingIdx, setCapturingIdx] = useState<number | null>(null);
   const [isBgmPlaying, setIsBgmPlaying] = useState(false);
   const [isCheck, setIsCheck] = useState(false);
-  const [wasInCheckState, setWasInCheck] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSetupOverlay, setShowSetupOverlay] = useState(false);
   const [selectingSetupFor, setSelectingSetupFor] = useState<Team>('cho');
   const [pendingMode, setPendingMode] = useState<'none' | 'tutorial' | 'match' | 'local_pvp'>('none');
   const [pendingDiff, setPendingDiff] = useState<string>('');
   const [pendingChoSetup, setPendingChoSetup] = useState<string>('');
+  const [curVideoId, setCurVideoId] = useState(DEFAULT_VIDEO_ID);
 
-  const [curVideoId, setCurVideoId] = useState('iQIkgz9P-nM');
   const ytPlayerRef = useRef<any>(null);
   const clackRef = useRef<HTMLAudioElement | null>(null);
 
@@ -61,7 +69,8 @@ const App: React.FC = () => {
     const root = document.documentElement;
     const topBar = document.querySelector('.top-bar') as HTMLElement;
     const tutBox = document.querySelector('.tutorial-box') as HTMLElement;
-    const uiH = (topBar?.offsetHeight || 0) + (tutBox?.offsetHeight || 0) + 40;
+    const banner = document.querySelector('.pvp-banner') as HTMLElement;
+    const uiH = (topBar?.offsetHeight || 0) + (tutBox?.offsetHeight || 0) + (banner?.offsetHeight || 0) + 40;
     const sqSize = Math.max(20, Math.floor(Math.min((window.innerWidth * 0.95) / 9.2, (window.innerHeight - uiH) / 10.2)));
     root.style.setProperty('--square-size', sqSize + 'px');
   }, []);
@@ -72,8 +81,12 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', fitBoard);
   }, [fitBoard]);
 
+  // [수정] 모드 전환(배너 등장/소멸) 시 보드 크기 재계산
+  useEffect(() => { fitBoard(); }, [gameMode, fitBoard]);
+
   const speakVoice = useCallback((text: string) => {
     if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel(); // [수정] 음성 겹침 방지
       const msg = new SpeechSynthesisUtterance(text);
       msg.lang = 'ko-KR';
       msg.rate = 1.1;
@@ -82,45 +95,55 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // [수정] YouTube IFrame API 스크립트를 실제로 로드하고, 플레이어는 최초 1회만 생성
   useEffect(() => {
-    // Initialize YouTube Player
-    const onYouTubeIframeAPIReady = () => {
+    let cancelled = false;
+    const init = () => {
+      if (cancelled || ytPlayerRef.current) return;
       ytPlayerRef.current = new (window as any).YT.Player('youtube-player', {
         height: '0',
         width: '0',
-        videoId: curVideoId,
+        videoId: DEFAULT_VIDEO_ID,
         host: 'https://www.youtube-nocookie.com',
-        playerVars: {
-          autoplay: 0,
-          loop: 1,
-          playlist: curVideoId,
-        },
+        playerVars: { autoplay: 0, loop: 1, playlist: DEFAULT_VIDEO_ID }
       });
     };
-
     if ((window as any).YT && (window as any).YT.Player) {
-      onYouTubeIframeAPIReady();
+      init();
     } else {
-      (window as any).onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+      const prev = (window as any).onYouTubeIframeAPIReady;
+      (window as any).onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') prev(); init(); };
+      if (!document.getElementById('yt-iframe-api')) {
+        const tag = document.createElement('script');
+        tag.id = 'yt-iframe-api';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
     }
-  }, [curVideoId]);
+    return () => {
+      cancelled = true;
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === 'function') {
+        ytPlayerRef.current.destroy();
+        ytPlayerRef.current = null;
+      }
+    };
+  }, []);
 
   const toggleBGM = () => {
-    if (ytPlayerRef.current) {
-      if (isBgmPlaying) {
-        ytPlayerRef.current.pauseVideo();
-      } else {
-        ytPlayerRef.current.playVideo();
-      }
-      setIsBgmPlaying(!isBgmPlaying);
-    }
+    const p = ytPlayerRef.current;
+    if (!p || typeof p.playVideo !== 'function') return;
+    if (isBgmPlaying) p.pauseVideo();
+    else p.playVideo();
+    setIsBgmPlaying(!isBgmPlaying);
   };
 
+  // [수정] 곡 변경은 loadVideoById만 사용 (플레이어 중복 생성 제거)
   const handleVideoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
     setCurVideoId(newId);
-    if (ytPlayerRef.current && ytPlayerRef.current.loadVideoById) {
-      ytPlayerRef.current.loadVideoById(newId);
+    const p = ytPlayerRef.current;
+    if (p && typeof p.loadVideoById === 'function') {
+      p.loadVideoById(newId);
       setIsBgmPlaying(true);
     }
   };
@@ -178,7 +201,7 @@ const App: React.FC = () => {
     add(3, 6, 'pawn', '兵', 'han');
     add(3, 8, 'pawn', '兵', 'han');
 
-    // 초나라(초록팀, 플레이어) — 아래쪽(row 6~9)
+    // 초나라(초록팀) — 아래쪽(row 6~9)
     add(9, 0, 'rook', '車', 'cho');
     add(9, 1, choP[0].t, choP[0].e, 'cho');
     add(9, 2, choP[1].t, choP[1].e, 'cho');
@@ -319,8 +342,9 @@ const App: React.FC = () => {
   const isKingFacing = useCallback((state: BoardState) => {
     let choKingIdx = -1, hanKingIdx = -1;
     for (let i = 0; i < BOARD_SIZE; i++) {
-      if (state[i] && state[i]?.type === 'king') {
-        if (state[i]?.color === 'cho') choKingIdx = i;
+      const p = state[i];
+      if (p && p.type === 'king') {
+        if (p.color === 'cho') choKingIdx = i;
         else hanKingIdx = i;
       }
     }
@@ -338,15 +362,14 @@ const App: React.FC = () => {
   const isKingInCheck = useCallback((state: BoardState, targetColor: Team) => {
     let kingIdx = -1;
     for (let i = 0; i < BOARD_SIZE; i++) {
-      if (state[i] && state[i]?.color === targetColor && state[i]?.type === 'king') {
-        kingIdx = i;
-        break;
-      }
+      const p = state[i];
+      if (p && p.color === targetColor && p.type === 'king') { kingIdx = i; break; }
     }
     if (kingIdx === -1) return false;
-    const opponent = targetColor === 'cho' ? 'han' : 'cho';
+    const opponent: Team = targetColor === 'cho' ? 'han' : 'cho';
     for (let i = 0; i < BOARD_SIZE; i++) {
-      if (state[i] && state[i]?.color === opponent) {
+      const p = state[i];
+      if (p && p.color === opponent) {
         const { caps } = calcPseudoMoves(i, state);
         if (caps.includes(kingIdx)) return true;
       }
@@ -354,6 +377,7 @@ const App: React.FC = () => {
     return false;
   }, [calcPseudoMoves]);
 
+  // [수정] 자살수 차단 + 왕끼리 마주보게 되는 수(빅장 유발 수)도 차단
   const getLegalMovesForPiece = useCallback((idx: number, state: BoardState) => {
     const piece = state[idx];
     if (!piece) return { moves: [], caps: [] };
@@ -361,33 +385,44 @@ const App: React.FC = () => {
     const legalMoves: number[] = [], legalCaps: number[] = [];
     const pieceColor = piece.color;
 
-    for (const to of moves) {
+    const isLegal = (from: number, to: number) => {
       const sim = [...state];
-      sim[to] = sim[idx];
-      sim[idx] = null;
-      // [패치 1.3] 내 왕이 장군을 맞는 자살수만 차단 (빅장 이동은 합법이므로 통과됨)
-      if (!isKingInCheck(sim, pieceColor)) legalMoves.push(to);
-    }
-    for (const to of caps) {
-      const sim = [...state];
-      sim[to] = sim[idx];
-      sim[idx] = null;
-      if (!isKingInCheck(sim, pieceColor)) legalCaps.push(to);
-    }
+      sim[to] = sim[from];
+      sim[from] = null;
+      return !isKingInCheck(sim, pieceColor) && !isKingFacing(sim);
+    };
+
+    for (const to of moves) if (isLegal(idx, to)) legalMoves.push(to);
+    for (const to of caps) if (isLegal(idx, to)) legalCaps.push(to);
     return { moves: legalMoves, caps: legalCaps };
-  }, [calcPseudoMoves, isKingInCheck]);
+  }, [calcPseudoMoves, isKingInCheck, isKingFacing]);
 
   const getAllLegalMoves = useCallback((state: BoardState, color: Team) => {
-    const allMoves: { from: number; to: number; isCapture: boolean }[] = [];
+    const allMoves: MoveOption[] = [];
     for (let i = 0; i < BOARD_SIZE; i++) {
-      if (state[i] && state[i]?.color === color) {
+      const p = state[i];
+      if (p && p.color === color) {
         const { moves, caps } = getLegalMovesForPiece(i, state);
-        moves.forEach(to => allMoves.push({ from: i, to: to, isCapture: false }));
-        caps.forEach(to => allMoves.push({ from: i, to: to, isCapture: true }));
+        moves.forEach(to => allMoves.push({ from: i, to, isCapture: false }));
+        caps.forEach(to => allMoves.push({ from: i, to, isCapture: true }));
       }
     }
     return allMoves;
   }, [getLegalMovesForPiece]);
+
+  // [수정] 탐색 전용 고속 수 생성기 (합법성 필터 생략 → level4~5 프리징 해결)
+  const getAllPseudoMoves = useCallback((state: BoardState, color: Team) => {
+    const allMoves: MoveOption[] = [];
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      const p = state[i];
+      if (p && p.color === color) {
+        const { moves, caps } = calcPseudoMoves(i, state);
+        moves.forEach(to => allMoves.push({ from: i, to, isCapture: false }));
+        caps.forEach(to => allMoves.push({ from: i, to, isCapture: true }));
+      }
+    }
+    return allMoves;
+  }, [calcPseudoMoves]);
 
   const evaluateBoard = useCallback((state: BoardState) => {
     let score = 0;
@@ -405,15 +440,26 @@ const App: React.FC = () => {
   }, []);
 
   const minimax = useCallback((state: BoardState, depth: number, alpha: number, beta: number, isMaximizing: boolean): number => {
+    // [수정] 왕이 잡힌 상태를 종결 노드로 즉시 판정
+    let hanKing = false, choKing = false;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      const p = state[i];
+      if (p && p.type === 'king') {
+        if (p.color === 'han') hanKing = true; else choKing = true;
+      }
+    }
+    if (!hanKing) return -999999 - depth;
+    if (!choKing) return 999999 + depth;
     if (depth === 0) return evaluateBoard(state);
-    const color = isMaximizing ? 'han' : 'cho';
-    const moves = getAllLegalMoves(state, color);
+
+    const color: Team = isMaximizing ? 'han' : 'cho';
+    const moves = getAllPseudoMoves(state, color); // [수정] 내부 탐색은 고속 생성기 사용
 
     if (moves.length === 0) return isMaximizing ? -999999 : 999999;
 
     if (isMaximizing) {
       let maxEval = -Infinity;
-      for (let m of moves) {
+      for (const m of moves) {
         const sim = [...state];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
@@ -425,7 +471,7 @@ const App: React.FC = () => {
       return maxEval;
     } else {
       let minEval = Infinity;
-      for (let m of moves) {
+      for (const m of moves) {
         const sim = [...state];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
@@ -436,7 +482,7 @@ const App: React.FC = () => {
       }
       return minEval;
     }
-  }, [evaluateBoard, getAllLegalMoves]);
+  }, [evaluateBoard, getAllPseudoMoves]);
 
   const selectMode = (mode: 'tutorial' | 'match' | 'local_pvp', diff: string) => {
     unlockAudio();
@@ -467,19 +513,20 @@ const App: React.FC = () => {
     setGameMode(pendingMode);
     setGameDiff(pendingDiff);
     setGameOver(false);
+    setResultText('');
     setTurn('cho');
     setBoard(makeSetup(choSetupType, hanSetupType));
     setIsProcessing(false);
-    
+
     if (pendingMode === 'tutorial') {
       setTutorialText("연습 모드! 양 팀 모두 만져볼 수 있어요!");
       setTurn('');
     } else if (pendingMode === 'local_pvp') {
-      setTutorialText("2인 대결 시작! 마스터 먼저 둡니다.");
+      setTutorialText("2인 대결 시작! 초록팀 먼저 둡니다.");
     } else {
       setTutorialText("대결 시작! 마스터 차례 (초록색 먼저)");
     }
-    
+
     setIsCheck(false);
     setSelIdx(null);
     setMoveCells([]);
@@ -489,6 +536,7 @@ const App: React.FC = () => {
   const goToMenu = () => {
     setGameOver(true);
     setGameMode('none');
+    setResultText('');
     setShowDiffOptions(false);
     setShowSetupOverlay(false);
     setTutorialText("모드를 골라주세요!");
@@ -512,40 +560,48 @@ const App: React.FC = () => {
     const { moves, caps } = getLegalMovesForPiece(idx, board);
     setMoveCells(moves);
     setCapCells(caps);
-    
+
     if (!isCheck) {
       if (moves.length === 0 && caps.length === 0) {
-        setTutorialText("이 말은 지금 움직일 수 없어요! (왕이 위험해집니다)");
+        setTutorialText("이 말은 지금 움직일 수 없어요! (왕이 위험해지거나 왕끼리 마주봐요)");
       } else {
         setTutorialText(DESC[piece.color][piece.type]);
       }
     }
   };
 
-  const afterMove = useCallback((isPlayer: boolean, captured: PieceData | null, movedColor: Team, currentState: BoardState) => {
-    if (captured && captured.type === 'king') {
-      const winner = gameMode === 'local_pvp' ? (movedColor === 'cho' ? '초나라(초록팀)' : '한나라(빨간팀)') : (movedColor === 'cho' ? '초나라(초록팀, 마스터)' : '한나라(빨간팀, 컴퓨터)');
+  // [수정] wasInCheck을 state가 아닌 인자로 전달받아 멍군 판정 시점 오류 제거
+  const afterMove = useCallback((isPlayer: boolean, captured: PieceData | null, movedColor: Team, currentState: BoardState, wasInCheck: boolean) => {
+    const teamName = (c: Team) => {
+      if (gameMode === 'local_pvp') return c === 'cho' ? '초나라(초록팀)' : '한나라(빨간팀)';
+      return c === 'cho' ? '초나라(초록팀, 마스터)' : '한나라(빨간팀, 컴퓨터)';
+    };
+    // [수정] confirm() 제거 → 결과 오버레이로 대체 (모든 환경에서 정상 동작)
+    const endGame = (msg: string, voice: string) => {
       setGameOver(true);
       setIsProcessing(false);
-      setTutorialText(`🎉 게임 종료! ${winner} 승리! 🎉`);
       setIsCheck(false);
-      speakVoice(`${winner} 승리! 게임이 끝났습니다.`);
-      setTimeout(() => {
-        if (confirm(`${winner} 승리! 메뉴로 돌아갈까요?`)) {
-          goToMenu();
-        }
-      }, 400);
+      setTutorialText(msg);
+      setResultText(msg);
+      speakVoice(voice);
+    };
+
+    if (captured && captured.type === 'king') {
+      // 안전장치 (합법수 필터상 정상 플레이에서는 도달하지 않음)
+      endGame(`🎉 게임 종료! ${teamName(movedColor)} 승리! 🎉`, `${teamName(movedColor)} 승리! 게임이 끝났습니다.`);
       return;
     }
 
-    const opponentColor = movedColor === 'cho' ? 'han' : 'cho';
+    const opponentColor: Team = movedColor === 'cho' ? 'han' : 'cho';
     const isOpponentInCheck = isKingInCheck(currentState, opponentColor);
     const isMeStillInCheck = isKingInCheck(currentState, movedColor);
 
     setTutorialText("");
-    if (wasInCheckState && !isMeStillInCheck) {
+    if (wasInCheck && !isMeStillInCheck) {
       speakVoice("멍군!");
-      setTutorialText("멋지게 멍군! 위험을 피했습니다.");
+      setTutorialText(gameMode === 'match' && movedColor === 'han'
+        ? "컴퓨터가 멍군! 위험을 피했네요."
+        : "멋지게 멍군! 위험을 피했습니다.");
     }
 
     if (isOpponentInCheck) {
@@ -558,25 +614,23 @@ const App: React.FC = () => {
 
     const opponentLegalMoves = getAllLegalMoves(currentState, opponentColor);
     if (opponentLegalMoves.length === 0) {
-      const winner = gameMode === 'local_pvp' ? (movedColor === 'cho' ? '초나라(초록팀)' : '한나라(빨간팀)') : (movedColor === 'cho' ? '초나라(초록팀, 마스터)' : '한나라(빨간팀, 컴퓨터)');
-      setGameOver(true);
-      setIsProcessing(false);
-      setTutorialText(`🎉 외통수! ${winner} 승리! 🎉`);
+      if (isOpponentInCheck) {
+        endGame(`🎉 외통수! ${teamName(movedColor)} 승리! 🎉`, "외통수! 게임이 끝났습니다.");
+        return;
+      }
+      // [수정] 장군이 아닌데 둘 수 없으면 패배가 아니라 '한수쉼'(장기 규칙) — 같은 쪽이 다시 둠
+      speakVoice("한수쉼!");
       setIsCheck(false);
-      speakVoice("외통수! 승리하셨습니다.");
-      setTimeout(() => {
-        if (confirm(`외통수! ${winner} 승리! 메뉴로 돌아갈까요?`)) {
-          goToMenu();
-        }
-      }, 600);
-      return;
+      setTutorialText(`${opponentColor === 'cho' ? '초록팀' : '빨간팀'}이 둘 수 없어 한수쉼! ${movedColor === 'cho' ? '초록팀' : '빨간팀'}이 다시 둡니다.`);
+      setIsProcessing(false);
+      return; // turn 유지 → match에서 han 차례면 useEffect가 컴퓨터를 다시 가동
     }
 
     if (gameMode === 'local_pvp') {
       setTurn(opponentColor);
       setIsProcessing(false);
       if (!isOpponentInCheck) {
-        setTutorialText(opponentColor === 'cho' ? "초록팀 차례! " : "빨간팀 차례! ");
+        setTutorialText(opponentColor === 'cho' ? "초록팀 차례!" : "빨간팀 차례!");
       }
     } else if (gameMode === 'match') {
       if (movedColor === 'cho') {
@@ -590,7 +644,7 @@ const App: React.FC = () => {
     } else {
       setIsProcessing(false);
     }
-  }, [gameMode, isKingInCheck, getAllLegalMoves, speakVoice, wasInCheckState]);
+  }, [gameMode, isKingInCheck, getAllLegalMoves, speakVoice]);
 
   const executeLogic = useCallback((from: number, to: number, isPlayer: boolean, capturedTarget: PieceData | null) => {
     if (clackRef.current) {
@@ -599,18 +653,19 @@ const App: React.FC = () => {
     }
 
     const newBoard = [...board];
-    const movedColor = newBoard[from]!.color;
-    const currentWasInCheck = isKingInCheck(board, movedColor);
-    
-    newBoard[to] = newBoard[from];
+    const moved = newBoard[from];
+    if (!moved) { setIsAnimating(false); setIsProcessing(false); return; }
+    const movedColor = moved.color;
+    const wasInCheck = isKingInCheck(board, movedColor); // [수정] 이동 직전 장군 여부를 지역 변수로 캡처
+
+    newBoard[to] = moved;
     newBoard[from] = null;
     setBoard(newBoard);
     clearSel();
 
     setTimeout(() => {
       setIsAnimating(false);
-      setWasInCheck(currentWasInCheck);
-      afterMove(isPlayer, capturedTarget, movedColor, newBoard);
+      afterMove(isPlayer, capturedTarget, movedColor, newBoard, wasInCheck);
     }, 350);
   }, [board, afterMove, isKingInCheck]);
 
@@ -625,7 +680,7 @@ const App: React.FC = () => {
     setIsAnimating(true);
     setCapturingIdx(to);
     const capturedTarget = board[to];
-    
+
     setTimeout(() => {
       setCapturingIdx(null);
       executeLogic(from, to, isPlayer, capturedTarget);
@@ -644,7 +699,7 @@ const App: React.FC = () => {
       return;
     }
 
-    let chosen: { from: number; to: number; isCapture: boolean } | null = null;
+    let chosen: MoveOption | null = null;
 
     if (gameDiff === 'level1') {
       chosen = moves[Math.floor(Math.random() * moves.length)];
@@ -653,40 +708,31 @@ const App: React.FC = () => {
       chosen = caps.length && Math.random() > 0.5 ? caps[Math.floor(Math.random() * caps.length)] : moves[Math.floor(Math.random() * moves.length)];
     } else if (gameDiff === 'level3') {
       let bestVal = -Infinity;
-      for (let m of moves) {
+      for (const m of moves) {
         const sim = [...board];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
         const val = evaluateBoard(sim);
-        if (val > bestVal) {
-          bestVal = val;
-          chosen = m;
-        }
+        if (val > bestVal) { bestVal = val; chosen = m; }
       }
     } else if (gameDiff === 'level4') {
       let bestVal = -Infinity;
-      for (let m of moves) {
+      for (const m of moves) {
         const sim = [...board];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
         const val = minimax(sim, 1, -Infinity, Infinity, false);
-        if (val > bestVal) {
-          bestVal = val;
-          chosen = m;
-        }
+        if (val > bestVal) { bestVal = val; chosen = m; }
       }
     } else if (gameDiff === 'level5') {
       moves.sort((a, b) => (b.isCapture ? 1 : 0) - (a.isCapture ? 1 : 0));
       let bestVal = -Infinity;
-      for (let m of moves) {
+      for (const m of moves) {
         const sim = [...board];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
         const val = minimax(sim, 2, -Infinity, Infinity, false);
-        if (val > bestVal) {
-          bestVal = val;
-          chosen = m;
-        }
+        if (val > bestVal) { bestVal = val; chosen = m; }
       }
     }
 
@@ -697,11 +743,12 @@ const App: React.FC = () => {
   }, [board, gameMode, gameOver, isAnimating, gameDiff, getAllLegalMoves, evaluateBoard, minimax, doCapture, doMove]);
 
   useEffect(() => {
-    if (turn === 'han' && !gameOver && !isAnimating) {
+    // [수정] match 모드에서만 컴퓨터 가동 (2인 대결에서 불필요한 호출 제거)
+    if (gameMode === 'match' && turn === 'han' && !gameOver && !isAnimating) {
       const timer = setTimeout(computerMove, 150);
       return () => clearTimeout(timer);
     }
-  }, [turn, gameOver, isAnimating, computerMove]);
+  }, [turn, gameMode, gameOver, isAnimating, computerMove]);
 
   const onSquareClick = (idx: number) => {
     if (gameOver || isAnimating || isProcessing) return;
@@ -709,7 +756,8 @@ const App: React.FC = () => {
 
     if (selIdx !== null) {
       if (idx === selIdx) { clearSel(); return; }
-      if (clicked && clicked.color === board[selIdx]?.color) {
+      const sel = board[selIdx];
+      if (clicked && sel && clicked.color === sel.color) {
         clearSel();
         selectPiece(idx);
         return;
@@ -738,7 +786,7 @@ const App: React.FC = () => {
   };
 
   const boardLines = useMemo(() => {
-    let lines = [];
+    const lines = [];
     const thin = '0.03', thick = '0.1';
     for (let i = 0; i <= 9; i++) lines.push(<line key={`h${i}`} x1="0" y1={i} x2="8" y2={i} stroke="#000" strokeWidth={thin} />);
     for (let i = 0; i <= 8; i++) lines.push(<line key={`v${i}`} x1={i} y1="0" x2={i} y2="9" stroke="#000" strokeWidth={thin} />);
@@ -771,12 +819,19 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      {/* [신규] 2인 대결: 맞은편(빨간팀) 플레이어를 위한 180도 회전 턴 안내 배너 */}
+      {gameMode === 'local_pvp' && !gameOver && (
+        <div className={`pvp-banner ${turn === 'han' ? 'red-turn' : ''}`}>
+          {isCheck && turn === 'han' ? '🚨 장군! 빨간팀 위기!' : (turn === 'han' ? '🔴 빨간팀 차례!' : '🟢 초록팀이 두는 중...')}
+        </div>
+      )}
+
       <div className="lego-board-wrapper">
         <div className="lego-board" id="board">
           <svg id="board-svg" width="100%" height="100%" viewBox="0 0 8 9" style={{ overflow: 'visible', position: 'absolute', zIndex: 1, pointerEvents: 'none' }}>
             {boardLines}
           </svg>
-          
+
           <div id="click-layer" style={{ position: 'absolute', width: '100%', height: '100%', zIndex: 30 }}>
             {Array.from({ length: BOARD_SIZE }).map((_, i) => {
               const r = Math.floor(i / COLS);
@@ -796,10 +851,12 @@ const App: React.FC = () => {
             if (!d) return null;
             const r = Math.floor(i / COLS);
             const c = i % COLS;
+            // [신규] 2인 대결에서는 빨간팀 기물을 180도 회전 → 마주 앉은 플레이어가 똑바로 읽음
+            const flipped = gameMode === 'local_pvp' && d.color === 'han' ? 'flipped' : '';
             return (
               <div
                 key={`p-${i}`}
-                className={`piece-wrapper ${d.color} ${selIdx === i ? 'selected' : ''} ${capturingIdx === i ? 'being-captured' : ''}`}
+                className={`piece-wrapper ${d.color} ${selIdx === i ? 'selected' : ''} ${capturingIdx === i ? 'being-captured' : ''} ${flipped}`}
                 style={{
                   transform: `translate(calc(var(--square-size) * ${c} - 50%), calc(var(--square-size) * ${r} - 50%))`
                 }}
@@ -818,8 +875,8 @@ const App: React.FC = () => {
           <div className="menu-title">어떤 모드로 해볼까?</div>
           <button className="menu-btn" onClick={() => selectMode('tutorial', '')}>1. 혼자 규칙 연습하기</button>
           <button className="menu-btn" onClick={() => setShowDiffOptions(true)}>2. 컴퓨터랑 대결하기</button>
-          <button className="menu-btn" style={{ backgroundColor: '#4CAF50', color: 'white', borderColor: '#2e7d32' }} onClick={() => selectMode('local_pvp', '')}>3. 2인 대결 (패드 같이 쓰기)</button>
-          
+          <button className="menu-btn" style={{ backgroundColor: '#4CAF50', color: 'white', borderColor: '#2e7d32' }} onClick={() => selectMode('local_pvp', '')}>3. 2인 대결 (마주보고 두기)</button>
+
           {showDiffOptions && (
             <div id="diff-options" className="diff-container" style={{ display: 'flex' }}>
               <button className="diff-btn" style={{ backgroundColor: '#8bc34a' }} onClick={() => selectMode('match', 'level1')}>1단계: 입문 (랜덤)</button>
@@ -834,11 +891,19 @@ const App: React.FC = () => {
 
       {showSetupOverlay && (
         <div id="setup-overlay" className="menu-overlay">
-          <div className="menu-title">{selectingSetupFor === 'cho' ? "마스터(초록팀) 포진 선택!" : "상대방(빨간팀) 포진 선택!"}</div>
+          <div className="menu-title">{selectingSetupFor === 'cho' ? "초록팀 포진 선택!" : "빨간팀 포진 선택!"}</div>
           <button className="menu-btn" style={{ backgroundColor: '#aed581' }} onClick={() => handleSetupSelection('MSSM')}>마-상-상-마 (안상, 기본)</button>
           <button className="menu-btn" style={{ backgroundColor: '#fff176' }} onClick={() => handleSetupSelection('SMMS')}>상-마-마-상 (바깥상)</button>
           <button className="menu-btn" style={{ backgroundColor: '#81d4fa' }} onClick={() => handleSetupSelection('MSMS')}>마-상-마-상 (오른상)</button>
           <button className="menu-btn" style={{ backgroundColor: '#ffb74d' }} onClick={() => handleSetupSelection('SMSM')}>상-마-상-마 (왼상)</button>
+        </div>
+      )}
+
+      {/* [신규] confirm() 대체 게임 종료 오버레이 */}
+      {gameOver && gameMode !== 'none' && resultText && (
+        <div id="result-overlay" className="menu-overlay">
+          <div className="menu-title">{resultText}</div>
+          <button className="menu-btn" onClick={goToMenu}>🏠 메뉴로 돌아가기</button>
         </div>
       )}
     </div>
