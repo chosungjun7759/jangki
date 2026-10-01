@@ -1,20 +1,19 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# 장기 마스터 (레고 장기 교실)
 
-# Run and deploy your AI Studio app
+아이패드에서 즐기는 레고 스타일 장기 게임입니다.
 
-This contains everything you need to run your app locally.
+- **혼자 규칙 연습하기**: 양 팀 말을 모두 움직여 보며 규칙을 익힙니다.
+- **컴퓨터랑 대결하기**: 1단계(입문)부터 5단계(마스터)까지 난이도를 고릅니다.
+- **2인 대결**: 태블릿을 사이에 두고 마주 앉아 둡니다. 빨간팀 말은 180도 돌아가 보입니다.
 
-View your app in AI Studio: https://ai.studio/apps/ecd15c8f-bd48-41ec-bf52-26abdc6b43c9
+AI Studio 앱: https://ai.studio/apps/ecd15c8f-bd48-41ec-bf52-26abdc6b43c9
 
-## Run Locally
+## 로컬에서 실행하기
 
-**Prerequisites:**  Node.js
+**필요한 것:** Node.js
 
+1. 의존성 설치: `npm install`
+2. 개발 서버 실행: `npm run dev` → http://localhost:3000
+3. 배포용 빌드: `npm run build` (결과물은 `dist/`)
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+API 키 등 별도 설정은 필요 없습니다.

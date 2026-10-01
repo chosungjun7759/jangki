@@ -64,9 +64,19 @@ const App: React.FC = () => {
 
   const ytPlayerRef = useRef<any>(null);
   const clackRef = useRef<HTMLAudioElement | null>(null);
+  // [수정] 게임 세션 번호 — 메뉴로 나가거나 새 게임을 시작하면 증가, 이전 게임의 지연 콜백을 무효화
+  const gameIdRef = useRef(0);
 
   const fitBoard = useCallback(() => {
     const root = document.documentElement;
+    // [수정] 낮은 가로 화면(휴대폰 가로)에서는 메뉴/안내를 보드 옆으로 배치 → 보드를 세로 높이에 맞춰 크게
+    const compact = window.innerWidth > window.innerHeight && window.innerHeight < 500;
+    root.classList.toggle('compact-landscape', compact);
+    if (compact) {
+      const sqSize = Math.max(20, Math.floor(Math.min((window.innerWidth - 300) / 9.2, (window.innerHeight - 24) / 10.2)));
+      root.style.setProperty('--square-size', sqSize + 'px');
+      return;
+    }
     const topBar = document.querySelector('.top-bar') as HTMLElement;
     const tutBox = document.querySelector('.tutorial-box') as HTMLElement;
     const banner = document.querySelector('.pvp-banner') as HTMLElement;
@@ -100,12 +110,32 @@ const App: React.FC = () => {
     let cancelled = false;
     const init = () => {
       if (cancelled || ytPlayerRef.current) return;
-      ytPlayerRef.current = new (window as any).YT.Player('youtube-player', {
-        height: '0',
-        width: '0',
+      const YT = (window as any).YT;
+      ytPlayerRef.current = new YT.Player('youtube-player', {
+        height: '1',
+        width: '1',
         videoId: DEFAULT_VIDEO_ID,
         host: 'https://www.youtube-nocookie.com',
-        playerVars: { autoplay: 0, loop: 1, playlist: DEFAULT_VIDEO_ID }
+        playerVars: { autoplay: 0, playsinline: 1 },
+        events: {
+          // [수정] 반복 재생을 직접 처리 (loop+playlist는 첫 곡에 고정되어 곡 변경 후 구구단송으로 되돌아감)
+          // [수정] 버튼 상태를 실제 재생 상태와 동기화 (자동재생이 막혀도 '음악 끄기'로 잘못 표시되지 않도록)
+          onStateChange: (e: any) => {
+            if (e.data === YT.PlayerState.ENDED) { e.target.seekTo(0); e.target.playVideo(); }
+            else if (e.data === YT.PlayerState.PLAYING) setIsBgmPlaying(true);
+            else if (e.data === YT.PlayerState.PAUSED) setIsBgmPlaying(false);
+          },
+          // [수정] 재생 불가 영상(예: 오류 150 — 업로더가 외부 재생 차단)이면 기본 곡으로 되돌림
+          onError: (e: any) => {
+            const failedId = e.target.getVideoData?.().video_id;
+            setIsBgmPlaying(false);
+            if (failedId && failedId !== DEFAULT_VIDEO_ID) {
+              setCurVideoId(DEFAULT_VIDEO_ID);
+              e.target.loadVideoById(DEFAULT_VIDEO_ID);
+              setTutorialText('🎵 이 곡은 재생할 수 없어서 기본 곡으로 바꿨어요.');
+            }
+          }
+        }
       });
     };
     if ((window as any).YT && (window as any).YT.Player) {
@@ -509,6 +539,7 @@ const App: React.FC = () => {
   };
 
   const startGame = (choSetupType: string, hanSetupType: string) => {
+    gameIdRef.current++;
     setShowSetupOverlay(false);
     setGameMode(pendingMode);
     setGameDiff(pendingDiff);
@@ -534,6 +565,9 @@ const App: React.FC = () => {
   };
 
   const goToMenu = () => {
+    gameIdRef.current++; // [수정] 진행 중이던 이동/컴퓨터 수의 지연 콜백 무효화
+    setIsAnimating(false);
+    setCapturingIdx(null);
     setGameOver(true);
     setGameMode('none');
     setResultText('');
@@ -663,7 +697,9 @@ const App: React.FC = () => {
     setBoard(newBoard);
     clearSel();
 
+    const gameId = gameIdRef.current;
     setTimeout(() => {
+      if (gameId !== gameIdRef.current) return; // 메뉴로 나갔거나 새 게임이 시작됨
       setIsAnimating(false);
       afterMove(isPlayer, capturedTarget, movedColor, newBoard, wasInCheck);
     }, 350);
@@ -681,7 +717,9 @@ const App: React.FC = () => {
     setCapturingIdx(to);
     const capturedTarget = board[to];
 
+    const gameId = gameIdRef.current;
     setTimeout(() => {
+      if (gameId !== gameIdRef.current) return; // 메뉴로 나갔거나 새 게임이 시작됨
       setCapturingIdx(null);
       executeLogic(from, to, isPlayer, capturedTarget);
     }, 320);
@@ -803,7 +841,10 @@ const App: React.FC = () => {
     <div className="lego-chess-container select-none">
       <audio ref={clackRef} src="https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3"></audio>
 
-      <div id="youtube-player" style={{ display: 'none' }}></div>
+      {/* [수정] display:none 대신 화면 밖 1px 배치 — iOS Safari는 숨겨진 플레이어의 재생을 막음 */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }} aria-hidden="true">
+        <div id="youtube-player"></div>
+      </div>
 
       <div className="top-bar">
         <h1 className="game-title">장기 마스터</h1>
