@@ -36,7 +36,7 @@ const DESC: Record<Team, Record<PieceType, string>> = {
   han: { rook: "차(車)", knight: "마(馬)", elephant: "상(象)", cannon: "포(包)", guard: "사(士)", king: "한(漢)", pawn: "병(兵)" }
 };
 
-const DEFAULT_VIDEO_ID = 'iQIkgz9P-nM';
+const BGM_VIDEO_ID = 'iQIkgz9P-nM'; // 신나는 구구단송
 
 const App: React.FC = () => {
   const [board, setBoard] = useState<BoardState>(Array(BOARD_SIZE).fill(null));
@@ -60,7 +60,6 @@ const App: React.FC = () => {
   const [pendingMode, setPendingMode] = useState<'none' | 'tutorial' | 'match' | 'local_pvp'>('none');
   const [pendingDiff, setPendingDiff] = useState<string>('');
   const [pendingChoSetup, setPendingChoSetup] = useState<string>('');
-  const [curVideoId, setCurVideoId] = useState(DEFAULT_VIDEO_ID);
 
   const ytPlayerRef = useRef<any>(null);
   const clackRef = useRef<HTMLAudioElement | null>(null);
@@ -114,27 +113,18 @@ const App: React.FC = () => {
       ytPlayerRef.current = new YT.Player('youtube-player', {
         height: '1',
         width: '1',
-        videoId: DEFAULT_VIDEO_ID,
+        videoId: BGM_VIDEO_ID,
         host: 'https://www.youtube-nocookie.com',
         playerVars: { autoplay: 0, playsinline: 1 },
         events: {
-          // [수정] 반복 재생을 직접 처리 (loop+playlist는 첫 곡에 고정되어 곡 변경 후 구구단송으로 되돌아감)
-          // [수정] 버튼 상태를 실제 재생 상태와 동기화 (자동재생이 막혀도 '음악 끄기'로 잘못 표시되지 않도록)
+          // [수정] 반복 재생을 직접 처리하고, 버튼 상태를 실제 재생 상태와 동기화
+          // (자동재생이 막혀도 '음악 끄기'로 잘못 표시되지 않도록)
           onStateChange: (e: any) => {
             if (e.data === YT.PlayerState.ENDED) { e.target.seekTo(0); e.target.playVideo(); }
             else if (e.data === YT.PlayerState.PLAYING) setIsBgmPlaying(true);
             else if (e.data === YT.PlayerState.PAUSED) setIsBgmPlaying(false);
           },
-          // [수정] 재생 불가 영상(예: 오류 150 — 업로더가 외부 재생 차단)이면 기본 곡으로 되돌림
-          onError: (e: any) => {
-            const failedId = e.target.getVideoData?.().video_id;
-            setIsBgmPlaying(false);
-            if (failedId && failedId !== DEFAULT_VIDEO_ID) {
-              setCurVideoId(DEFAULT_VIDEO_ID);
-              e.target.loadVideoById(DEFAULT_VIDEO_ID);
-              setTutorialText('🎵 이 곡은 재생할 수 없어서 기본 곡으로 바꿨어요.');
-            }
-          }
+          onError: () => setIsBgmPlaying(false)
         }
       });
     };
@@ -165,17 +155,6 @@ const App: React.FC = () => {
     if (isBgmPlaying) p.pauseVideo();
     else p.playVideo();
     setIsBgmPlaying(!isBgmPlaying);
-  };
-
-  // [수정] 곡 변경은 loadVideoById만 사용 (플레이어 중복 생성 제거)
-  const handleVideoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newId = e.target.value;
-    setCurVideoId(newId);
-    const p = ytPlayerRef.current;
-    if (p && typeof p.loadVideoById === 'function') {
-      p.loadVideoById(newId);
-      setIsBgmPlaying(true);
-    }
   };
 
   const unlockAudio = () => {
@@ -407,7 +386,7 @@ const App: React.FC = () => {
     return false;
   }, [calcPseudoMoves]);
 
-  // [수정] 자살수 차단 + 왕끼리 마주보게 되는 수(빅장 유발 수)도 차단
+  // 자살수(내 왕이 잡히는 수)만 차단. 빅장(왕끼리 마주보기)은 실제 장기처럼 둘 수 있는 수 → afterMove에서 처리
   const getLegalMovesForPiece = useCallback((idx: number, state: BoardState) => {
     const piece = state[idx];
     if (!piece) return { moves: [], caps: [] };
@@ -419,13 +398,13 @@ const App: React.FC = () => {
       const sim = [...state];
       sim[to] = sim[from];
       sim[from] = null;
-      return !isKingInCheck(sim, pieceColor) && !isKingFacing(sim);
+      return !isKingInCheck(sim, pieceColor);
     };
 
     for (const to of moves) if (isLegal(idx, to)) legalMoves.push(to);
     for (const to of caps) if (isLegal(idx, to)) legalCaps.push(to);
     return { moves: legalMoves, caps: legalCaps };
-  }, [calcPseudoMoves, isKingInCheck, isKingFacing]);
+  }, [calcPseudoMoves, isKingInCheck]);
 
   const getAllLegalMoves = useCallback((state: BoardState, color: Team) => {
     const allMoves: MoveOption[] = [];
@@ -597,7 +576,7 @@ const App: React.FC = () => {
 
     if (!isCheck) {
       if (moves.length === 0 && caps.length === 0) {
-        setTutorialText("이 말은 지금 움직일 수 없어요! (왕이 위험해지거나 왕끼리 마주봐요)");
+        setTutorialText("이 말은 지금 움직일 수 없어요! (움직이면 왕이 위험해져요)");
       } else {
         setTutorialText(DESC[piece.color][piece.type]);
       }
@@ -605,7 +584,8 @@ const App: React.FC = () => {
   };
 
   // [수정] wasInCheck을 state가 아닌 인자로 전달받아 멍군 판정 시점 오류 제거
-  const afterMove = useCallback((isPlayer: boolean, captured: PieceData | null, movedColor: Team, currentState: BoardState, wasInCheck: boolean) => {
+  // wasFacing: 이 수를 두기 직전에 이미 빅장 상태였는지 (= 상대가 빅장을 불렀는지)
+  const afterMove = useCallback((isPlayer: boolean, captured: PieceData | null, movedColor: Team, currentState: BoardState, wasInCheck: boolean, wasFacing: boolean) => {
     const teamName = (c: Team) => {
       if (gameMode === 'local_pvp') return c === 'cho' ? '초나라(초록팀)' : '한나라(빨간팀)';
       return c === 'cho' ? '초나라(초록팀, 마스터)' : '한나라(빨간팀, 컴퓨터)';
@@ -629,22 +609,45 @@ const App: React.FC = () => {
     const opponentColor: Team = movedColor === 'cho' ? 'han' : 'cho';
     const isOpponentInCheck = isKingInCheck(currentState, opponentColor);
     const isMeStillInCheck = isKingInCheck(currentState, movedColor);
+    const isFacingNow = isKingFacing(currentState);
+    const shortName = (c: Team) => (c === 'cho' ? '초록팀' : '빨간팀');
 
-    setTutorialText("");
+    // [신규] 빅장(실제 장기 규칙): 상대가 빅장을 불렀는데 막거나 피하지 않고 두면 빅장 성립 → 무승부
+    if (wasFacing && isFacingNow && gameMode !== 'tutorial') {
+      endGame("🤝 빅장 성립! 무승부입니다. 🤝", "빅장! 무승부입니다.");
+      return;
+    }
+    const bikjangCalled = isFacingNow && !wasFacing;
+
+    // [수정] 멍군·빅장 회피 안내는 아래 '차례' 안내와 합쳐서 보여줌 (이전에는 차례 안내에 덮여 보이지 않았음)
+    let prefix = "";
     if (wasInCheck && !isMeStillInCheck) {
       speakVoice("멍군!");
-      setTutorialText(gameMode === 'match' && movedColor === 'han'
+      prefix = gameMode === 'match' && movedColor === 'han'
         ? "컴퓨터가 멍군! 위험을 피했네요."
-        : "멋지게 멍군! 위험을 피했습니다.");
+        : "멋지게 멍군! 위험을 피했습니다.";
+    } else if (wasFacing && !isFacingNow) {
+      prefix = gameMode === 'match' && movedColor === 'han'
+        ? "컴퓨터가 빅장을 피했어요."
+        : "빅장을 피했어요.";
     }
+    const withPrefix = (t: string) => (prefix ? prefix + "\n" + t : t);
+    setTutorialText(prefix);
 
+    // speakVoice는 이전 음성을 끊으므로 장군·빅장이 겹치면 한 번에 말함
+    const bikjangText = `빅장! ${shortName(opponentColor)}이 왕 사이를 막거나 왕을 옮기지 않으면 무승부예요.`;
     if (isOpponentInCheck) {
-      speakVoice("장군!");
+      speakVoice(bikjangCalled ? "장군! 빅장!" : "장군!");
       setIsCheck(true);
-      setTutorialText("장군!! 적의 왕이 위험합니다!");
+      setTutorialText("장군!! 적의 왕이 위험합니다!" + (bikjangCalled ? "\n" + bikjangText : ""));
     } else {
       setIsCheck(false);
+      if (bikjangCalled) {
+        speakVoice("빅장!");
+        setTutorialText(bikjangText);
+      }
     }
+    const hasNotice = isOpponentInCheck || bikjangCalled; // 차례 안내로 덮어쓰지 않을 메시지
 
     const opponentLegalMoves = getAllLegalMoves(currentState, opponentColor);
     if (opponentLegalMoves.length === 0) {
@@ -663,22 +666,22 @@ const App: React.FC = () => {
     if (gameMode === 'local_pvp') {
       setTurn(opponentColor);
       setIsProcessing(false);
-      if (!isOpponentInCheck) {
-        setTutorialText(opponentColor === 'cho' ? "초록팀 차례!" : "빨간팀 차례!");
+      if (!hasNotice) {
+        setTutorialText(withPrefix(opponentColor === 'cho' ? "초록팀 차례!" : "빨간팀 차례!"));
       }
     } else if (gameMode === 'match') {
       if (movedColor === 'cho') {
         setTurn('han');
-        if (!isOpponentInCheck) setTutorialText("로봇이 수읽기 중... 🤔");
+        if (!hasNotice) setTutorialText(withPrefix("로봇이 수읽기 중... 🤔"));
       } else {
         setTurn('cho');
         setIsProcessing(false);
-        if (!isOpponentInCheck) setTutorialText("마스터 차례! 공격하세요!");
+        if (!hasNotice) setTutorialText(withPrefix("마스터 차례! 공격하세요!"));
       }
     } else {
       setIsProcessing(false);
     }
-  }, [gameMode, isKingInCheck, getAllLegalMoves, speakVoice]);
+  }, [gameMode, isKingInCheck, isKingFacing, getAllLegalMoves, speakVoice]);
 
   const executeLogic = useCallback((from: number, to: number, isPlayer: boolean, capturedTarget: PieceData | null) => {
     if (clackRef.current) {
@@ -691,6 +694,7 @@ const App: React.FC = () => {
     if (!moved) { setIsAnimating(false); setIsProcessing(false); return; }
     const movedColor = moved.color;
     const wasInCheck = isKingInCheck(board, movedColor); // [수정] 이동 직전 장군 여부를 지역 변수로 캡처
+    const wasFacing = isKingFacing(board); // 이동 직전 빅장 여부
 
     newBoard[to] = moved;
     newBoard[from] = null;
@@ -701,9 +705,9 @@ const App: React.FC = () => {
     setTimeout(() => {
       if (gameId !== gameIdRef.current) return; // 메뉴로 나갔거나 새 게임이 시작됨
       setIsAnimating(false);
-      afterMove(isPlayer, capturedTarget, movedColor, newBoard, wasInCheck);
+      afterMove(isPlayer, capturedTarget, movedColor, newBoard, wasInCheck, wasFacing);
     }, 350);
-  }, [board, afterMove, isKingInCheck]);
+  }, [board, afterMove, isKingInCheck, isKingFacing]);
 
   const doMove = useCallback((from: number, to: number, isPlayer: boolean) => {
     setIsProcessing(true);
@@ -731,13 +735,32 @@ const App: React.FC = () => {
       return;
     }
 
-    const moves = getAllLegalMoves(board, 'han');
+    let moves = getAllLegalMoves(board, 'han');
     if (moves.length === 0) {
       setIsProcessing(false);
       return;
     }
 
+    // [신규] 빅장을 받은 상태: 기본적으로 막거나 피함.
+    // 고급·마스터는 졸 2개 이상 뒤지고 있으면 무승부(빅장 성립)를 받아들임
+    const facingBefore = isKingFacing(board);
+    if (facingBefore) {
+      const keepsFacing = (m: MoveOption) => {
+        const sim = [...board];
+        sim[m.to] = sim[m.from];
+        sim[m.from] = null;
+        return isKingFacing(sim);
+      };
+      const breaking = moves.filter(m => !keepsFacing(m));
+      const accepting = moves.filter(keepsFacing);
+      const behind = evaluateBoard(board) < -PIECE_VALUE.pawn * 10 * 2;
+      if ((gameDiff === 'level4' || gameDiff === 'level5') && behind && accepting.length) moves = accepting;
+      else if (breaking.length) moves = breaking;
+    }
+
     let chosen: MoveOption | null = null;
+    // [신규] 빅장을 부르는 수는 상대가 받으면 무승부 → 0점으로 평가 (이기는 중이면 피하고, 지는 중이면 노림)
+    const scoreWithBikjang = (sim: BoardState, val: number) => (!facingBefore && isKingFacing(sim) ? 0 : val);
 
     if (gameDiff === 'level1') {
       chosen = moves[Math.floor(Math.random() * moves.length)];
@@ -750,7 +773,7 @@ const App: React.FC = () => {
         const sim = [...board];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
-        const val = evaluateBoard(sim);
+        const val = scoreWithBikjang(sim, evaluateBoard(sim));
         if (val > bestVal) { bestVal = val; chosen = m; }
       }
     } else if (gameDiff === 'level4') {
@@ -759,7 +782,7 @@ const App: React.FC = () => {
         const sim = [...board];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
-        const val = minimax(sim, 1, -Infinity, Infinity, false);
+        const val = scoreWithBikjang(sim, minimax(sim, 1, -Infinity, Infinity, false));
         if (val > bestVal) { bestVal = val; chosen = m; }
       }
     } else if (gameDiff === 'level5') {
@@ -769,7 +792,7 @@ const App: React.FC = () => {
         const sim = [...board];
         sim[m.to] = sim[m.from];
         sim[m.from] = null;
-        const val = minimax(sim, 2, -Infinity, Infinity, false);
+        const val = scoreWithBikjang(sim, minimax(sim, 2, -Infinity, Infinity, false));
         if (val > bestVal) { bestVal = val; chosen = m; }
       }
     }
@@ -778,7 +801,7 @@ const App: React.FC = () => {
 
     if (chosen.isCapture) doCapture(chosen.from, chosen.to, false);
     else doMove(chosen.from, chosen.to, false);
-  }, [board, gameMode, gameOver, isAnimating, gameDiff, getAllLegalMoves, evaluateBoard, minimax, doCapture, doMove]);
+  }, [board, gameMode, gameOver, isAnimating, gameDiff, getAllLegalMoves, isKingFacing, evaluateBoard, minimax, doCapture, doMove]);
 
   useEffect(() => {
     // [수정] match 모드에서만 컴퓨터 가동 (2인 대결에서 불필요한 호출 제거)
@@ -849,12 +872,8 @@ const App: React.FC = () => {
       <div className="top-bar">
         <h1 className="game-title">장기 마스터</h1>
         <div className="btn-group">
-          <select id="bgm-select" className="bgm-select" value={curVideoId} onChange={handleVideoChange}>
-            <option value="iQIkgz9P-nM">🎵 신나는 구구단송</option>
-            <option value="SEwmVVhlqyg">🎻 똑똑해지는 모차르트</option>
-          </select>
           <button id="bgm-toggle" className={`action-btn bgm-btn ${isBgmPlaying ? 'bg-red-500' : 'bg-green-500'}`} onClick={toggleBGM}>
-            {isBgmPlaying ? '🔇 음악 끄기' : '▶ 음악 켜기'}
+            {isBgmPlaying ? '🔇 음악 끄기' : '🎵 구구단송 켜기'}
           </button>
           <button className="action-btn menu-back-btn" onClick={goToMenu}>🏠 메뉴</button>
         </div>

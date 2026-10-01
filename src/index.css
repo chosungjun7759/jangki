@@ -10,7 +10,6 @@ body { background-color: #f4f4f4; overflow: hidden; display: flex; flex-directio
 .game-title { color: var(--lego-red); font-size: clamp(16px, 5vmin, 28px); font-weight: 900; margin: 0; text-shadow: 0.2vmin 0.2vmin 0 white; white-space: nowrap; }
 
 .btn-group { display: flex; gap: 1vmin; align-items: center; }
-.bgm-select { padding: 0.8vmin 1vmin; font-size: clamp(11px, 2.3vmin, 15px); border-radius: 1vmin; border: 0.2vmin solid var(--lego-red); font-weight: bold; outline: none; min-width: 0; }
 .action-btn { padding: 1vmin 2vmin; font-size: clamp(11px, 2.5vmin, 15px); color: white; border: none; border-radius: 1vmin; font-weight: bold; cursor: pointer; box-shadow: 0.3vmin 0.3vmin 1vmin rgba(0,0,0,0.2); transition: transform 0.1s; white-space: nowrap; }
 .action-btn:active { transform: scale(0.95); }
 .bgm-btn { background-color: #4CAF50; }
