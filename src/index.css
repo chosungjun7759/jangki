@@ -52,8 +52,8 @@ body { background-color: #f4f4f4; overflow: hidden; display: flex; flex-directio
 /* [신규] 낮은 가로 화면(휴대폰 가로): 보드 왼쪽, 메뉴·안내 오른쪽 */
 .compact-landscape .lego-chess-container {
   display: grid; grid-template-columns: auto 260px; column-gap: 16px; justify-content: center; align-items: center;
-  grid-template-rows: 1fr auto auto auto 1fr;
-  grid-template-areas: "board ." "board top" "board banner" "board tut" "board .";
+  grid-template-rows: 1fr auto auto auto auto 1fr;
+  grid-template-areas: "board ." "board top" "board banner" "board tut" "board ctl" "board .";
   height: 100dvh; padding-block: 12px;
 }
 .compact-landscape .lego-board-wrapper { grid-area: board; }
@@ -62,3 +62,5 @@ body { background-color: #f4f4f4; overflow: hidden; display: flex; flex-directio
 .compact-landscape .btn-group > * { flex: 1 1 auto; }
 .compact-landscape .pvp-banner { grid-area: banner; width: 100%; margin: 1vh 0 0; }
 .compact-landscape .tutorial-box { grid-area: tut; width: 100%; }
+.compact-landscape .ks-bar.ks-top { grid-area: banner; width: 100%; }
+.compact-landscape .ks-bar.ks-bottom { grid-area: ctl; width: 100%; }
